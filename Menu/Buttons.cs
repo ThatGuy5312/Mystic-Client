@@ -305,8 +305,8 @@ namespace MysticClient.Menu
                 //AddButton("Slow Gun[RG][RT][M]", ()=> SlowGun("Right Grip And Trigger To Slow Target"), true, false, "Right Grip And Trigger To Slow Target"),
                 AddButton("Glider Blind All", ()=> GliderBlindAll(), true, false, "Closed Overpowered Mods"),
                 AddButton("Glider Blind Gun[RG][RT]", ()=> GliderBlindGun(), true, false, "Right Grip And Trigger To Vibrate Target"),
-                AddButton("Drop Block", ()=> SpamThingo(), true, false, "dropin bloks"),
-                AddButton("destroy bloko", ()=> DestroyBlockGun(), true, false, "detroy blokos"),
+                //AddButton("Drop Block", ()=> SpamThingo(), true, false, "dropin bloks"),
+                //AddButton("destroy bloko", ()=> DestroyBlockGun(), true, false, "detroy blokos"),
             },
 
             new ButtonInfo[] // visuals 18
