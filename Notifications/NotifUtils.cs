@@ -9,6 +9,10 @@ namespace MysticClient.Notifications
         {
             return "<color=" + color + ">" + text + "</color>";
         }
+        public static string Menu()
+        {
+            return "<color=grey>[</color><color=purple>Menu</color><color=grey>]</color> ";
+        }
         public static string Voice()
         {
             return "<color=grey>[</color><color=purple>VOICE</color><color=grey>]</color> ";

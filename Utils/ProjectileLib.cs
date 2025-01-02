@@ -22,23 +22,6 @@ namespace MysticClient.Utils
                 var trail = (SlingshotProjectileTrail)GetProjectile((int)args[1]);
                 trail.AttachTrail(projectile.gameObject, false, false);
             }
-            /*var color = Color.white;
-            if (rainbowColor && !(bool)args[5])
-            {
-                color = RGBColor();
-            }
-            else if (funnyRGB && !rainbowColor && !(bool)args[5])
-            {
-                color = HardColor(Random.Range(0, 10));
-            }
-            else if (!funnyRGB && !rainbowColor && (Color)args[4] == null)
-            {
-                color = Color.white;
-            }
-            else if ((Color)args[4] != null || (bool)args[5])
-            {
-                color = (Color)args[4];
-            }*/
             int counter = 0;
             projectile.Launch((Vector3)args[2], (Vector3)args[3], RigUtils.MyNetPlayer, false, false, counter++, (float)args[5], true, (Color)args[4]);
         }
@@ -100,7 +83,7 @@ namespace MysticClient.Utils
                 }
                 VelocityEstimator.enabled = false;
                 var projectile = (SnowballThrowable)GetProjectile((int)args[0]);
-                //SlingshotProjectile component = projectile.AddComponent<SlingshotProjectile>();
+                //var component = projectile.AddComponent<SlingshotProjectile>();
                 if (!projectile.gameObject.activeSelf)
                 {
                     projectile.EnableSnowballLocal(true);
@@ -154,8 +137,20 @@ namespace MysticClient.Utils
                     var LRPC = typeof(PaperPlaneThrowable).GetField("gLaunchRPC", BindingFlags.NonPublic | BindingFlags.Static);
                     var PE = (PhotonEvent)LRPC.GetValue(ppt);
                     object[] objs = { eventid, pos, rot, vel };
-                    PE.RaiseOthers(objs);
+                    PE.RaiseAll(objs);
                 }
+            }
+        }
+        public class Elf
+        {
+            public static void BetaLaunchElf(object[] args)
+            {
+                var _events = (RubberDuckEvents)typeof(ElfLauncher).GetField("_events", NonPublicInstance).GetValue(typeof(RubberDuckEvents));
+                _events.Activate.RaiseAll(new object[]
+                {
+                    (Vector3)args[0], // position
+                    (Vector3)args[1] // velocity
+                });
             }
         }
     }

@@ -18,14 +18,6 @@ namespace MysticClient.Patches
             }
         }
 
-        internal static void RemoveHarmonyPatches()
-        {
-            if (instance != null && IsPatched)
-            {
-                IsPatched = false;
-            }
-        }
-
         private static Harmony instance;
     }
 }

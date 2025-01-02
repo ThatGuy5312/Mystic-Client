@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Globalization;
 using System.Linq;
 using BepInEx;
+using MysticClient.Menu;
+using MysticClient.Utils;
 using UnityEngine;
 using UnityEngine.UI;
 using static MysticClient.Menu.MenuSettings;
@@ -84,7 +87,7 @@ namespace MysticClient.Notifications
             }
         }
 
-        public static void SendNotification(string NotificationText)
+        public static void SendNotification(string NotificationText, bool playSound = true)
         {
             if (!disableNotifications)
             {
@@ -99,11 +102,50 @@ namespace MysticClient.Notifications
                         NotifiText.text = NotifiText.text + NotificationText;
                         NotifiText.supportRichText = true;
                         PreviousNotifi = NotificationText;
+                        if (Main.GetEnabled("Dynamic Sounds") && playSound)
+                        {
+                            if (NotificationText.Contains("ERROR"))
+                                Loaders.PlayAudio(Main.AudioClips[7]);
+                            else
+                                Loaders.PlayAudio(Main.AudioClips[2]);
+                        }
                     }
                 }
                 catch
                 {
-                    Debug.LogError("Notification failed, object probably nil due to third person ; " + NotificationText);
+                    Debug.LogError("Notification failed, object probably null due to third person | " + NotificationText);
+                }
+            }
+        }
+        private static float notifDelay = 0f;
+        public static void SendNotification(string NotificationText, float delay, bool playSound = true)
+        {
+            if (!disableNotifications)
+            {
+                try
+                {
+                    if (IsEnabled && PreviousNotifi != NotificationText && Time.time > notifDelay)
+                    {
+                        if (!NotificationText.Contains(Environment.NewLine))
+                        {
+                            NotificationText += Environment.NewLine;
+                        }
+                        NotifiText.text = NotifiText.text + NotificationText;
+                        NotifiText.supportRichText = true;
+                        PreviousNotifi = NotificationText;
+                        notifDelay = Time.time + delay;
+                        if (Main.GetEnabled("Dynamic Sounds") && playSound)
+                        {
+                            if (NotificationText.Contains("ERROR"))
+                                Loaders.PlayAudio(Main.AudioClips[7]);
+                            else
+                                Loaders.PlayAudio(Main.AudioClips[2]);
+                        }
+                    }
+                }
+                catch
+                {
+                    Debug.LogError("Notification failed, object probably null due to third person | " + NotificationText);
                 }
             }
         }

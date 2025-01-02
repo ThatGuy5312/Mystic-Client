@@ -11,23 +11,38 @@ using static MysticClient.Notifications.NotifiLib;
 using static MysticClient.Mods.Projectiles;
 using MysticClient.Utils;
 using System;
+using MysticClient.Notifications;
+using System.Collections;
+using System.Linq;
+using UnityEngine.Windows.Speech;
+using static OVRPlugin;
+using static MysticClient.Mods.Visuals;
+using UnityEngine.UI;
+using SColor = System.Drawing.Color;
+using Valve.VR.InteractionSystem;
+using static UnityEngine.UIElements.UxmlAttributeDescription;
+using Viveport;
+using TMPro;
+using Unity.XR.CoreUtils;
+using GorillaNetworking;
+using System.Xml;
+using Steamworks;
 
 namespace MysticClient.Mods
 {
-    public class Settings
+    public class Settings : MonoBehaviour
     {
-        private static int[] Mode = new int[9999];
-        private static PrimitiveType[] shapes = { PrimitiveType.Cube, PrimitiveType.Sphere, PrimitiveType.Capsule, PrimitiveType.Cylinder, PrimitiveType.Plane, PrimitiveType.Quad }; // iidk told me to do (PrimitiveType)Mode[i] but it breaks so im not
-        public static Color[] colors = { Color.black, new Color(0.541f, 0.027f, 0.761f, 0.004f), Color.blue, Color.yellow, new Color(1f, 0.51f, 0f, 0.004f), Color.white, Color.cyan, Color.green, Color.red, new Color32(135, 0, 0, 1), Color.magenta, Color.gray };
+        public static int[] Mode = new int[9999];
+        private static PrimitiveType[] shapes = { PrimitiveType.Cube, PrimitiveType.Sphere, PrimitiveType.Capsule, PrimitiveType.Cylinder, PrimitiveType.Plane, PrimitiveType.Quad }; // iidk told me to do (PrimitiveType)Mode[ii] but it breaks so im not
+        public static Color[] colors = { Color.black, new Color(.541f, .027f, .761f, 1), Color.blue, Color.yellow, new Color(1, .51f, 0, 1), Color.white, Color.cyan, Color.green, Color.red, new Color32(135, 0, 0, 1), Color.magenta, Color.gray };
         public static Color[] unityc = { Color.black, Color.blue, Color.yellow, Color.white, Color.cyan, Color.green, Color.red, Color.magenta, Color.gray };
         private static int[] flySpeeds = { 15, 10, 25 };
         private static int[] speedBoostSpeeds = { 12, 9, 16, 25, int.MaxValue };
         private static int[] times = { 3, 6, 0, 1 };
         private static int[] destroyDelays = { 0, 2, 5, 10, int.MaxValue };
-        private static Action[] menuTypes = { ()=>MysticTemplate(), ()=>ThatGuyTemplate(), ()=>AZTemplate(), ()=>KFJTemplate() };
-        private static Action[] pageTypes = { ()=>BottomPageButtons(), ()=>SidePageButtons(), ()=>TopPageButtons() };
-        private static int[] buttonSounds = { 67, 66, 176, 8, 18, 244, 221, 0 };
+        private static int[] buttonSounds = { 67, 66, 176, 8, 18, 244, 221, 84 };
         private static Vector3[] pointerPoses = { new Vector3(0, -.1f, -.15f), new Vector3(0, .1f, 0), new Vector3(0, -.1f, 0) };
+        private static int[] mcsoundid = { 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23 };
         public static string[][] Names =
         {
             new string[] { "Black", "Purple", "Blue", "Yellow", "Orange", "White", "Cyan", "Green", "Red", "Blood", "Magenta", "Gray" }, // 0
@@ -35,20 +50,84 @@ namespace MysticClient.Mods
             new string[] { "None", "Hands", "Body" }, // 2
             new string[] { "Normal", "Slow", "Fast" }, // 3
             new string[] { "Normal", "Small", "Big", "Huge", "???" }, // 4
-            new string[] { "Day", "Dawn", "Hight", "Sun Rise", "Untouched" }, // 5
+            new string[] { "Day", "Dawn", "Night", "Sun Rise", "Untouched" }, // 5
             new string[] { "Bottom", "Sides", "Top" }, // 6
             new string[] { "Quest", "Steam", "Steam / Quest" }, // 7
-            new string[] { "Mystic", "ThatGuy", "AZ", "KFJ" }, // 8
+            new string[] { "Mystic", "ThatGuy", "AZ", "KFJ" }, // 8 (not used)
             new string[] { "Black", "Blue", "Yellow", "White", "Cyan", "Green", "Red", "Magenta", "Gray" }, // 9
             new string[] { "Instant", "2s", "5s", "10s", "Never" }, // 10
-            new string[] { "Click", "Key", "Cloud", "Wood", "Metal", "Ding", "Glass", "Dynamic" }, // 11
-            new string[] { "Sharp", "Boring", "Bendy" }, // 12
+            new string[] { "Click", "Key", "Cloud", "Wood", "Metal", "Ding", "Glass", "Bubble" }, // 11
+            new string[] { "Sharp", "Boring", "Bendy", "Spiral" }, // 12
+            new string[] { "Grass", "Dirt", "Wood", "Leaf", "Oak Plank", "Stone", "Cobblestone", "Hay Bale", "Glass", "Obsidian", "Water", "Trap Door" }, // 13
+            new string[] { "Living Mice", "Clark", "Danny", "Oxygene", "Key", "Droopy Likes your Face", "Moog City", "Moog City 2", "Subwoofer Lullaby", "Dog", "Cat", "Aria Math", "Haggstorm", "Pigstep", "Pigstep (Alan Becker)" }, // 14
+            new string[] { "Arial", "Consolas", "Constantia", "Corbel", "Cascadia Mono", "Courier New", "Segoe Print", "Segoe Script", "Gabriola", "Ink Free", "Lucida Console", "Comic Sans MS", "Palatino Linotype", "Impact", "Candara", "Verdana" }, // 15
         };
 
+        public static void ChangeMenuTrailColor(string tooltip)
+        {
+            Mode[29]++;
+            var len = GetEnabled("Use System Colors") ? scolor.Length : colors.Length;
+            if (Mode[29] >= len) { Mode[25] = 0; }
+            var name = GetEnabled("Use System Colors") ? systemColorNames[Mode[29]] : Names[0][Mode[29]];
+            menuTrailColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[29]]) : colors[Mode[29]];
+            string[] text = GetToolTip(tooltip).buttonText.Split(':');
+            GetToolTip(tooltip).buttonText = text[0] + ": " + name;
+            GetToolTip(tooltip).enabled = false;
+        }
+        public static void ChangeFont(string tooltip)
+        {
+            Mode[28]++;
+            if (Mode[28] >= Names[15].Length) { Mode[28] = 0; }
+            currentFont = Font.CreateDynamicFontFromOSFont(Names[15][Mode[28]], 1);
+            string[] text = GetToolTip(tooltip).buttonText.Split(':');
+            GetToolTip(tooltip).buttonText = text[0] + ": " + Names[15][Mode[28]];
+            GetToolTip(tooltip).enabled = false;
+        }
+        public static void ChangeMCSong(string tooltip)
+        {
+            Mode[27]++;
+            if (Mode[27] >= Names[14].Length) { Mode[27] = 0; }
+            Fun.mcSongClip = AudioClips[mcsoundid[Mode[27]]];
+            string[] text = GetToolTip(tooltip).buttonText.Split(':');
+            GetToolTip(tooltip).buttonText = text[0] + ": " + Names[14][Mode[27]];
+            GetToolTip(tooltip).enabled = false;
+        }
+        public static void ChangeMCTexture(string tooltip)
+        {
+            Mode[26]++;
+            if (Mode[26] >= Names[13].Length) { Mode[26] = 0; }
+            Fun.mcBlockTexture = MCTextures[Mode[26]];
+            string[] text = GetToolTip(tooltip).buttonText.Split(':');
+            GetToolTip(tooltip).buttonText = text[0] + ": " + Names[13][Mode[26]];
+            GetToolTip(tooltip).enabled = false;
+        }
+        public static void ChangeHandTrailColor(string tooltip)
+        {
+            Mode[25]++;
+            var len = GetEnabled("Use System Colors") ? scolor.Length : colors.Length;
+            if (Mode[25] >= len) { Mode[25] = 0; }
+            var name = GetEnabled("Use System Colors") ? systemColorNames[Mode[25]] : Names[0][Mode[25]];
+            handTrailColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[25]]) : colors[Mode[25]];
+            string[] text = GetToolTip(tooltip).buttonText.Split(':');
+            GetToolTip(tooltip).buttonText = text[0] + ": " + name;
+            GetToolTip(tooltip).enabled = false;
+        }
+        public static void ChangeMenuOutlineColor(string tooltip)
+        {
+            Mode[24]++;
+            var len = GetEnabled("Use System Colors") ? scolor.Length : colors.Length;
+            if (Mode[24] >= len) { Mode[24] = 0; }
+            var name = GetEnabled("Use System Colors") ? systemColorNames[Mode[24]] : Names[0][Mode[24]];
+            outlineColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[24]]) : colors[Mode[24]];
+            string[] text = GetToolTip(tooltip).buttonText.Split(':');
+            GetToolTip(tooltip).buttonText = text[0] + ": " + name;
+            GetToolTip(tooltip).enabled = false;
+        }
+        // Mode[23] used near bottom
         public static void ChangeGunType(string tooltip)
         {
             Mode[22]++;
-            if (Mode[22] >= 3) { Mode[22] = 0; }
+            if (Mode[22] >= Names[12].Length) { Mode[22] = 0; }
             GunLib.gunType = Mode[22];
             string[] text = GetToolTip(tooltip).buttonText.Split(':');
             GetToolTip(tooltip).buttonText = text[0] + ": " + Names[12][Mode[22]];
@@ -58,7 +137,7 @@ namespace MysticClient.Mods
         public static void ChangeButtonSound(string tooltip)
         {
             Mode[21]++;
-            if (Mode[21] >= colors.Length) { Mode[21] = 0; }
+            if (Mode[21] >= buttonSounds.Length) { Mode[21] = 0; }
             buttonSound = buttonSounds[Mode[21]];
             string[] text = GetToolTip(tooltip).buttonText.Split(':');
             GetToolTip(tooltip).buttonText = text[0] + ": " + Names[11][Mode[21]];
@@ -67,28 +146,34 @@ namespace MysticClient.Mods
         public static void ChangePlatformSecondColor(string tooltip)
         {
             Mode[20]++;
-            if (Mode[20] >= colors.Length) { Mode[20] = 0; }
-            Movement.PlatSecondColor = colors[Mode[20]];
+            var len = GetEnabled("Use System Colors") ? scolor.Length : colors.Length;
+            if (Mode[20] >= len) { Mode[20] = 0; }
+            var name = GetEnabled("Use System Colors") ? systemColorNames[Mode[20]] : Names[0][Mode[20]];
+            Movement.PlatSecondColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[20]]) : colors[Mode[20]];
             string[] text = GetToolTip(tooltip).buttonText.Split(':');
-            GetToolTip(tooltip).buttonText = text[0] + ": " + Names[0][Mode[20]];
+            GetToolTip(tooltip).buttonText = text[0] + ": " + name;
             GetToolTip(tooltip).enabled = false;
         }
         public static void ChangePlatformFirstColor(string tooltip)
         {
             Mode[19]++;
-            if (Mode[19] >= colors.Length) { Mode[19] = 0; }
-            Movement.PlatFirstColor = colors[Mode[19]];
+            var len = GetEnabled("Use System Colors") ? scolor.Length : colors.Length;
+            if (Mode[19] >= len) { Mode[19] = 0; }
+            var name = GetEnabled("Use System Colors") ? systemColorNames[Mode[19]] : Names[0][Mode[19]];
+            Movement.PlatFirstColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[19]]) : colors[Mode[19]];
             string[] text = GetToolTip(tooltip).buttonText.Split(':');
-            GetToolTip(tooltip).buttonText = text[0] + ": " + Names[0][Mode[19]];
+            GetToolTip(tooltip).buttonText = text[0] + ": " + name;
             GetToolTip(tooltip).enabled = false;
         }
         public static void ChangePlatformColor(string tooltip)
         {
             Mode[18]++;
-            if (Mode[18] >= colors.Length) { Mode[18] = 0; }
-            Movement.PlatColor = colors[Mode[18]];
+            var len = GetEnabled("Use System Colors") ? scolor.Length : colors.Length;
+            if (Mode[18] >= len) { Mode[18] = 0; }
+            var name = GetEnabled("Use System Colors") ? systemColorNames[Mode[18]] : Names[0][Mode[18]];
+            Movement.PlatColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[18]]) : colors[Mode[18]];
             string[] text = GetToolTip(tooltip).buttonText.Split(':');
-            GetToolTip(tooltip).buttonText = text[0] + ": " + Names[0][Mode[18]];
+            GetToolTip(tooltip).buttonText = text[0] + ": " + name;
             GetToolTip(tooltip).enabled = false;
         }
         public static void ChangeMenuDestroyTime(string tooltip)
@@ -109,30 +194,8 @@ namespace MysticClient.Mods
             GetToolTip(tooltip).buttonText = text[0] + ": " + Names[9][Mode[16]];
             GetToolTip(tooltip).enabled = false;
         }
-        public static void ChangeMenuType(string tooltip)
-        {
-            Mode[15]++;
-            if (Mode[15] >= menuTypes.Length) { Mode[15] = 0; }
-            menuTypes[Mode[15]].Invoke();
-            string[] text = GetToolTip(tooltip).buttonText.Split(':');
-            GetToolTip(tooltip).buttonText = text[0] + ": " + Names[8][Mode[15]];
-            GetToolTip(tooltip).enabled = false;
-            if (GetToolTip("Changed Page Type").buttonText.Contains("Bottom"))
-                BottomPageButtons();
-            else if (GetToolTip("Changed Page Type").buttonText.Contains("Sides"))
-                SidePageButtons();
-            else if (GetToolTip("Changed Page Type").buttonText.Contains("Top"))
-                TopPageButtons();
-        }
-        public static void ChangePageType(string tooltip)
-        {
-            Mode[14]++;
-            if (Mode[14] >= pageTypes.Length) { Mode[14] = 0; }
-            pageTypes[Mode[14]].Invoke();
-            string[] text = GetToolTip(tooltip).buttonText.Split(':');
-            GetToolTip(tooltip).buttonText = text[0] + ": " + Names[6][Mode[14]];
-            GetToolTip(tooltip).enabled = false;
-        }
+        // 15 was used for change menu type
+        // 14 was used for change page type
         public static void ChangePointerPosition(string tooltip)
         {
             Mode[13]++;
@@ -218,19 +281,23 @@ namespace MysticClient.Mods
         public static void ChangeMenuButtonOffColor(string tooltip)
         {
             Mode[4]++;
-            if (Mode[4] >= colors.Length) { Mode[4] = 0; }
-            ButtonColorDisable = colors[Mode[4]];
+            var len = GetEnabled("Use System Colors") ? scolor.Length : colors.Length;
+            if (Mode[4] >= len) { Mode[4] = 0; }
+            var name = GetEnabled("Use System Colors") ? systemColorNames[Mode[4]] : Names[0][Mode[4]];
+            ButtonColorDisable = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[4]]) : colors[Mode[4]];
             string[] text = GetToolTip(tooltip).buttonText.Split(':');
-            GetToolTip(tooltip).buttonText = text[0] + ": " + Names[0][Mode[4]];
+            GetToolTip(tooltip).buttonText = text[0] + ": " + name;
             GetToolTip(tooltip).enabled = false;
         }
         public static void ChangeMenuButtonOnColor(string tooltip)
         {
             Mode[3]++;
-            if (Mode[3] >= colors.Length) { Mode[3] = 0; }
-            ButtonColorEnabled = colors[Mode[3]];
+            var len = GetEnabled("Use System Colors") ? scolor.Length : colors.Length;
+            if (Mode[3] >= len) { Mode[3] = 0; }
+            var name = GetEnabled("Use System Colors") ? systemColorNames[Mode[3]] : Names[0][Mode[3]];
+            ButtonColorEnabled = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[3]]) : colors[Mode[3]];
             string[] text = GetToolTip(tooltip).buttonText.Split(':');
-            GetToolTip(tooltip).buttonText = text[0] + ": " + Names[0][Mode[3]];
+            GetToolTip(tooltip).buttonText = text[0] + ": " + name;
             GetToolTip(tooltip).enabled = false;
         }
         public static void ChangeMenuSecondColor(string tooltip)
@@ -254,12 +321,47 @@ namespace MysticClient.Mods
         public static void ChangeMenuColor(string tooltip)
         {
             Mode[0]++;
-            if (Mode[0] >= colors.Length) { Mode[0] = 0; }
-            NormalColor = colors[Mode[0]];
+            var len = GetEnabled("Use System Colors") ? scolor.Length : colors.Length;
+            if (Mode[0] >= len) { Mode[0] = 0; }
+            var name = GetEnabled("Use System Colors") ? systemColorNames[Mode[0]] : Names[0][Mode[0]];
+            NormalColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[0]]) : colors[Mode[0]];
             string[] text = GetToolTip(tooltip).buttonText.Split(':');
-            GetToolTip(tooltip).buttonText = text[0] + ": " + Names[0][Mode[0]];
+            GetToolTip(tooltip).buttonText = text[0] + ": " + name;
             GetToolTip(tooltip).enabled = false;
         }
+        public static void RefreshSettings()
+        {
+            //NormalColor = colors[Mode[0]];
+            NormalColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[0]]) : colors[Mode[0]];
+            //FirstColor = colors[Mode[1]]; // not used
+            //SecondColor = colors[Mode[2]]; // not used
+            ButtonColorEnabled = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[3]]) : colors[Mode[3]];
+            ButtonColorDisable = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[4]]) : colors[Mode[4]];
+            physicSetting = Mode[5];
+            Rig.GhostType = Mode[6];
+            GunLib.gunShape = shapes[Mode[7]]; GunLib.pointer = null;
+            GunLib.enabledColor = unityc[Mode[8]];
+            GunLib.disabledColor = unityc[Mode[9]];
+            Movement.flySpeed = flySpeeds[Mode[10]];
+            Movement.speedBoostSpeed = speedBoostSpeeds[Mode[11]];
+            BetterDayNightManager.instance.SetTimeOfDay(times[Mode[12]]);
+            pointerPosition = pointerPoses[Mode[13]];
+            buttonTextColor = unityc[Mode[16]];
+            destroyDelay = destroyDelays[Mode[17]];
+            Movement.PlatColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[18]]) : colors[Mode[18]];
+            Movement.PlatFirstColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[19]]) : colors[Mode[19]];
+            Movement.PlatSecondColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[20]]) : colors[Mode[20]];
+            buttonSound = buttonSounds[Mode[21]];
+            GunLib.gunType = Mode[22];
+            RefreshTheme(); // 23
+            outlineColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[24]]) : colors[Mode[24]];
+            handTrailColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[25]]) : colors[Mode[25]];
+            Fun.mcBlockTexture = MCTextures[Mode[26]];
+            Fun.mcSongClip = AudioClips[mcsoundid[Mode[27]]];
+            currentFont = Font.CreateDynamicFontFromOSFont(Names[15][Mode[28]], 1);
+            menuTrailColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[29]]) : colors[Mode[29]];
+        }
+
         public static void SetWind(bool enabled)
         {
             foreach (var volumes in GetForceVolumes())
@@ -289,6 +391,7 @@ namespace MysticClient.Mods
                 }
             } else { SendNotification(Error() + "Only Use While Using Headset"); GetIndex("First Person Camera").enabled = false; }
         }
+
         public static void TPC()
         {
             if (FPCamera != null)
@@ -297,206 +400,520 @@ namespace MysticClient.Mods
                 FPCamera = null;
             }
         }
-        public static void EnterPage(int page)
+
+        public static void EnterPage(int page, int index = 0)
         {
             buttonsType = page;
             pageNumber = 0;
-        }
-        public static void Save2()
-        {
-            foreach (var buttons in Buttons.buttons)
-                foreach (var button in buttons)
-                    if (!button.toolTip.Contains("Changed"))
-                        PlayerPrefs.SetString(button.buttonText, JsonUtility.ToJson(button.enabled));
-                    else
-                    {
-                        PlayerPrefs.SetString("Menu Color", JsonUtility.ToJson(colors[Mode[0]]));
-                        PlayerPrefs.SetString("Menu First Color", JsonUtility.ToJson(colors[Mode[1]]));
-                        PlayerPrefs.SetString("Menu Second Color", JsonUtility.ToJson(colors[Mode[2]]));
-                        PlayerPrefs.SetString("Button Color Enbaled", JsonUtility.ToJson(colors[Mode[3]]));
-                        PlayerPrefs.SetString("Button Color Disabled", JsonUtility.ToJson(colors[Mode[4]]));
-                        PlayerPrefs.SetString("Menu Physics", JsonUtility.ToJson(physicSetting));
-                        PlayerPrefs.SetString("Ghost Type", JsonUtility.ToJson(Rig.GhostType));
-                        PlayerPrefs.SetString("Projectile", JsonUtility.ToJson(projectile));
-                        PlayerPrefs.SetString("Trail", JsonUtility.ToJson(trail));
-                        PlayerPrefs.SetString("Proj Shoot Speed", JsonUtility.ToJson(projSpeeds[Projectiles.Mode[4]]));
-                        PlayerPrefs.SetString("Projectile Color", JsonUtility.ToJson(colors[Projectiles.Mode[3]]));
-                        PlayerPrefs.SetString("Proj Hand Type", JsonUtility.ToJson(Projectiles.Mode[0]));
-                        PlayerPrefs.SetString("Gun Type", JsonUtility.ToJson(GunLib.gunShape));
-                        PlayerPrefs.SetString("Gun Disabled Color", JsonUtility.ToJson(colors[Mode[9]]));
-                        PlayerPrefs.SetString("Gun Enabled Color", JsonUtility.ToJson(colors[Mode[8]]));
-                        PlayerPrefs.SetString("Projectile Scale", JsonUtility.ToJson(sizes[Projectiles.Mode[5]]));
-                    }
-        }
-        public static void Save()
-        {
-            GetIndex("Save Preferences").enabled = false;
-            Directory.CreateDirectory("MysticClient\\ButtonSave");
-            List<string> enabled = new List<string>();
-            foreach (var buttons in Buttons.buttons)
-                foreach (var button in buttons)
-                    if (button.enabled)
-                        enabled.Add(button.buttonText);
-            File.WriteAllLines("MysticClient\\ButtonSave\\Save.txt", enabled);
-        }
-        public static void Load()
-        {
-            GetIndex("Load Preferences").enabled = false;
-            string[] lines = File.ReadAllLines("MysticClient\\Buttons\\Save.txt");
-            foreach (string line in lines)
-                foreach (var buttons in Buttons.buttons)
-                    foreach (var button in buttons)
-                        if (button.buttonText == line)
-                            button.enabled = true;
-        }
-        public static void Load2()
-        {
-            foreach (var buttons in Buttons.buttons)
-                foreach (var button in buttons)
-                    if (!button.toolTip.Contains("Changed"))
-                        button.enabled = PlayerPrefs.HasKey(button.buttonText) ? JsonUtility.FromJson<bool>(PlayerPrefs.GetString(button.buttonText)) : false;
-                    else
-                    {
-                        NormalColor = PlayerPrefs.HasKey("Menu Color") ? JsonUtility.FromJson<Color>(PlayerPrefs.GetString("Menu Color")) : Color.black;
-                        FirstColor = PlayerPrefs.HasKey("Menu First Color") ? JsonUtility.FromJson<Color>(PlayerPrefs.GetString("Menu First Color")) : Color.black;
-                        SecondColor = PlayerPrefs.HasKey("Menu Second Color") ? JsonUtility.FromJson<Color>(PlayerPrefs.GetString("Menu Second Color")) : Color.black;
-                        ButtonColorEnabled = PlayerPrefs.HasKey("Button Color Enabled") ? JsonUtility.FromJson<Color>(PlayerPrefs.GetString("Button Color Enabled")) : Color.gray;
-                        ButtonColorDisable = PlayerPrefs.HasKey("Button Color Disabled") ? JsonUtility.FromJson<Color>(PlayerPrefs.GetString("Button Color Disabled")) : Color.cyan;
-                        physicSetting = PlayerPrefs.HasKey("Menu Physics") ? JsonUtility.FromJson<int>(PlayerPrefs.GetString("Menu Physics")) : 0;
-                        projectile = PlayerPrefs.HasKey("Projectile") ? JsonUtility.FromJson<int>(PlayerPrefs.GetString("Projectile")) : -675036877;
-                        trail = PlayerPrefs.HasKey("Trail") ? JsonUtility.FromJson<int>(PlayerPrefs.GetString("Trail")) : -1;
-                        projectileSpeed = PlayerPrefs.HasKey("Proj Shoot Speed") ? JsonUtility.FromJson<int>(PlayerPrefs.GetString("Proj Shoot Speed")) : 1;
-                        projectileColor = PlayerPrefs.HasKey("Projectile Color") ? JsonUtility.FromJson<Color>(PlayerPrefs.GetString("Projectile Color")) : Color.white;
-                        Projectiles.Mode[0] = PlayerPrefs.HasKey("Proj Hand Type") ? JsonUtility.FromJson<int>(PlayerPrefs.GetString("Proj Hand Speed")) : 0;
-                        GunLib.gunShape = PlayerPrefs.HasKey("Gun Type") ? JsonUtility.FromJson<PrimitiveType>(PlayerPrefs.GetString("Gun Type")) : PrimitiveType.Cube;
-                        GunLib.disabledColor = PlayerPrefs.HasKey("Gun Disabled Color") ? JsonUtility.FromJson<Color>(PlayerPrefs.GetString("Gun Disabled Color")) : Color.black;
-                        GunLib.enabledColor = PlayerPrefs.HasKey("Gun Enabled Color") ? JsonUtility.FromJson<Color>(PlayerPrefs.GetString("Gun Enabled Color")) : Color.black;
-                        Projectiles.projSize = PlayerPrefs.HasKey("Projectile Scale") ? JsonUtility.FromJson<int>(PlayerPrefs.GetString("Projectile Scale")) : 1;
-                    }
+            easyPage = index;
         }
 
-        private static void BottomPageButtons()
+        // originaly made by kingofnetflix https://github.com/kingofnetflix/BAnANA/blob/master/BAnANA/BAnANA/Main/VoiceManager.cs
+        private static KeywordRecognizer enablePhrase;
+        private static KeywordRecognizer modPhrase;
+
+        private static Dictionary<string, Action> commands;
+
+        private static string[] phrase = { "mystic", "client", "jarvis", "google", "siri", "alaxa", "computer", "console", "bitch", "azmyth", "thatguy", "that guy", "chat GPT", "goober", "rat", "skid", "good sir", "good ser" };
+        private static string[] discardPhrase = { "cancel", "stop", "nevermind", "never mind", "shut the fuck up" };
+
+        private static bool listening = false;
+
+        void Start()
         {
-            if (Mode[15] == 0)
+            commands = new Dictionary<string, Action>();
+            foreach (var btnss in Buttons.buttons)
+                foreach (var btns in btnss)
+                    foreach (var btn in btns)
+                        if (btn.buttonText.Contains("["))
+                            commands[btn.buttonText.Split('[')[0].ToLower()] = () => Toggle(btn.buttonText);
+                        else if (btn.buttonText.Contains(":"))
+                            commands["change " + btn.buttonText.Split(':')[0].ToLower()] = () => Toggle(btn.buttonText);
+                        else
+                            commands[btn.buttonText.ToLower()] = () => Toggle(btn.buttonText);
+        }
+
+        public static void EnableVoiceCommands()
+        {
+            if (enablePhrase == null || !enablePhrase.IsRunning)
             {
-                pageButtonSize = new Vector3(0.045f, 0.25f, 0.064295f);
-                pagePoss[0] = new Vector3(0.56f, 0.37f, -0.78f);
-                pagePoss[1] = new Vector3(0.56f, -0.37f, -0.78f);
-            }
-            if (Mode[15] == 1)
-            {
-                pageButtonSize = new Vector3(0.045f, 0.25f, 0.064295f);
-                pagePoss[0] = new Vector3(0.56f, 0.37f, -0.68f);
-                pagePoss[1] = new Vector3(0.56f, -0.37f, -0.68f);
-            }
-            if (Mode[15] == 2)
-            {
-                pageButtonSize = new Vector3(0.045f, 0.25f, 0.064295f);
-                pagePoss[0] = new Vector3(0.56f, 0.37f, -.95f);
-                pagePoss[1] = new Vector3(0.56f, -0.37f, -.95f);
-            }
-            if (Mode[15] == 3)
-            {
-                pageButtonSize = new Vector3(0.045f, 0.25f, 0.064295f);
-                pagePoss[0] = new Vector3(0.56f, 0.65f, -0.68f);
-                pagePoss[1] = new Vector3(0.56f, -0.65f, -0.68f);
+                enablePhrase = new KeywordRecognizer(phrase);
+                enablePhrase.OnPhraseRecognized += Recognition;
+                enablePhrase.Start();
             }
         }
-        private static void SidePageButtons()
+
+        private static void Recognition(PhraseRecognizedEventArgs args)
         {
-            if (Mode[15] != 3)
+            if (Array.Exists(phrase, element => element == args.text))
+            {
+                listening = true;
+                if (GetEnabled("Dynamic Sounds"))
+                    Loaders.PlayAudio(AudioClips[3]);
+                StartCommandRecognition();
+                listeningCoroutine = MUtils._RunCoroutine(Timeout());
+                SendNotification(Voice() + "listening..", false);
+            }
+        }
+        private static void StartCommandRecognition()
+        {
+            modPhrase = new KeywordRecognizer(commands.Keys.ToArray());
+            modPhrase.OnPhraseRecognized += CommandRecognition;
+            modPhrase.Start();
+        }
+
+        private static void CommandRecognition(PhraseRecognizedEventArgs args)
+        {
+            if (listening && commands.ContainsKey(args.text))
+            {
+                commands[args.text]?.Invoke();
+                if (listeningCoroutine != null)
+                    MUtils._EndCoroutine(listeningCoroutine);
+                SendNotification(Voice() + $"Toggled {args.text}", false);
+                Loaders.PlayAudio(AudioClips[4]);
+                listening = false;
+            }
+            else if (listening && discardPhrase.Contains(args.text))
+            {
+                CancelVoiceCommand();
+                SendNotification(Voice() + "Canceling..");
+                listening = false;
+            }
+        }
+
+        public static void StopVoiceCommands()
+        {
+            listening = false;
+            if (enablePhrase != null)
+                enablePhrase.Stop();
+            if (modPhrase != null)
+                modPhrase.Stop();
+            enablePhrase = null;
+            modPhrase = null;
+        }
+        private static Coroutine listeningCoroutine;
+        public static IEnumerator Timeout()
+        {
+            yield return new WaitForSeconds(6);
+            if (listening)
+            {
+                listening = false;
+                if (enablePhrase != null && modPhrase != null)
+                    CancelVoiceCommand();
+                if (GetEnabled("Dynamic Sounds"))
+                    Loaders.PlayAudio(AudioClips[4]);
+                SendNotification(Voice() + "No input stopped listening");
+            }
+        }
+
+        private static void CancelVoiceCommand()
+        {
+            listening = false;
+            modPhrase.Stop();
+            modPhrase.Dispose();
+        }
+
+        public static void NoCamMod(bool active)
+        {
+            foreach (var objs in GetGameObjects())
+                if (objs.name.Contains("LCK"))
+                    objs.SetActive(active);
+        }
+        private static string[] themeNames =
+        {
+            "Mystic",
+            "Mystic Sides",
+            "ThatGuy",
+            "ThatGuy Sides",
+            "AZ",
+            "II Template",
+            "KMan",
+            "Mango",
+            "Sial Temp?",
+            //"PayPal",
+            "Wide",
+            "Really Wide",
+            "Long"
+        };
+        // pagePoss[0] = previous
+        // pagePoss[1] = next
+
+        // size is in depth, width, hight
+        public static void ChangeMenuTheme(string tooltip)
+        {
+            Mode[23]++;
+            if (Mode[23] >= themeNames.Length) { Mode[23] = 0; }
+            string[] text = GetToolTip(tooltip).buttonText.Split(':');
+            GetToolTip(tooltip).buttonText = text[0] + ": " + themeNames[Mode[23]];
+            GetToolTip(tooltip).enabled = false;
+            RefreshTheme();
+        }
+
+        private static void RefreshTheme()
+        {
+            if (Mode[23] == 0) // mystic
+            {
+                parentSize = new Vector3(.1f, .3f, .4f);
+                pageButtonSize = new Vector3(0.045f, 0.25f, 0.064295f);
+                pagePoss[0] = new Vector3(0.56f, 0.37f, 0.55f);
+                pagePoss[1] = new Vector3(0.56f, -0.37f, 0.55f);
+                menuSize = new Vector3(.1f, 1, 1.2f);
+                menuPos = new Vector3(0.05f, 0f, -0.05f);
+                buttonSize = new Vector3(.09f, .8f, .08f);
+                buttonPos = new Vector3(.56f, 0, .29f);
+                buttonOffset = 1f;
+                internalButtonOffset = .13f;
+                //buttonTextPos = new Vector3(.064f, 0f, .111f);
+                //buttonTextOffset = 2.6f; // 3.05
+                buttonFontStyle = FontStyle.Normal;
+                titleFontStyle = FontStyle.Normal;
+                pageSize = 8;
+                toolTipZ = -.27f;
+                menuTitleZ = .173f;
+                nextPageText = "";
+                lastPageText = "";
+                disconnectSize = new Vector3(0.045f, 0.66f, 0.17f);
+                disconnectPos = new Vector3(0.50f, -1.122f, .1f);
+            }
+            else if (Mode[23] == 1) // mystic sides
             {
                 pageButtonSize = new Vector3(0.045f, 0.25f, 1f);
                 pagePoss[0] = new Vector3(0.56f, 0.65f, -.1f); // -.571f
                 pagePoss[1] = new Vector3(0.56f, -0.65f, -.1f);
-                return;
+                menuSize = new Vector3(.1f, 1, 1.2f);
+                buttonSize = new Vector3(.09f, .8f, .08f);
+                buttonPos = new Vector3(.56f, 0, .29f);
+                buttonOffset = 1f;
+                //buttonTextPos = new Vector3(.064f, 0f, .111f);
+                //buttonTextOffset = 2.6f; // 3.05
+                buttonFontStyle = FontStyle.Normal;
+                titleFontStyle = FontStyle.Normal;
+                pageSize = 8;
+                toolTipZ = -.27f;
+                menuTitleZ = .173f;
             }
-            pageButtonSize = new Vector3(0.045f, 0.25f, 1f);
-            pagePoss[0] = new Vector3(0.56f, .9f, -.1f); // -.571f
-            pagePoss[1] = new Vector3(0.56f, -.9f, -.1f);
-        }
-        private static void TopPageButtons()
-        {
-            if (Mode[15] == 0)
-            {
-                pageButtonSize = new Vector3(0.045f, 0.25f, 0.064295f);
-                pagePoss[0] = new Vector3(0.56f, 0.37f, 0.55f);
-                pagePoss[1] = new Vector3(0.56f, -0.37f, 0.55f);
-            }
-            if (Mode[15] == 1)
+            else if (Mode[23] == 2) // thatguy
             {
                 pageButtonSize = new Vector3(0.045f, 0.25f, 0.064295f);
                 pagePoss[0] = new Vector3(0.56f, 0.37f, 0.45f);
                 pagePoss[1] = new Vector3(0.56f, -0.37f, 0.45f);
+                menuSize = new Vector3(.1f, 1, 1);
+                buttonSize = new Vector3(.09f, .8f, .08f);
+                buttonPos = new Vector3(.56f, 0, .19f);
+                buttonOffset = 1;
+                //buttonTextPos = new Vector3(.064f, 0, .076f);
+                //buttonTextOffset = 2.55f;
+                buttonFontStyle = FontStyle.Italic;
+                titleFontStyle = FontStyle.BoldAndItalic;
+                pageSize = 6;
+                toolTipZ = -.22f;
+                menuTitleZ = .125f;
             }
-            if (Mode[15] == 2)
+            else if (Mode[23] == 3) // thatguy sides
             {
-                pageButtonSize = new Vector3(0.045f, 0.25f, 0.064295f);
-                pagePoss[0] = new Vector3(0.56f, 0.37f, 0.68f);
-                pagePoss[1] = new Vector3(0.56f, -0.37f, 0.68f);
+                pageButtonSize = new Vector3(0.045f, 0.25f, 1f);
+                pagePoss[0] = new Vector3(0.56f, 0.65f, -.1f);
+                pagePoss[1] = new Vector3(0.56f, -0.65f, -.1f);
+                menuSize = new Vector3(.1f, 1, 1);
+                buttonSize = new Vector3(.09f, .8f, .08f);
+                buttonPos = new Vector3(.56f, 0, .19f);
+                buttonOffset = 1;
+                //buttonTextPos = new Vector3(.064f, 0, .076f);
+                //buttonTextOffset = 2.55f;
+                buttonFontStyle = FontStyle.Italic;
+                titleFontStyle = FontStyle.BoldAndItalic;
+                pageSize = 6;
+                toolTipZ = -.22f;
+                menuTitleZ = .125f;
             }
-            if (Mode[15] == 3)
+            else if (Mode[23] == 4) // AZ
+            {
+                pageButtonSize = new Vector3(0.045f, 0.25f, 1f);
+                pagePoss[0] = new Vector3(0.56f, 0.65f, -.1f);
+                pagePoss[1] = new Vector3(0.56f, -0.65f, -.1f);
+                menuSize = new Vector3(.1f, 1, 1.5f);
+                buttonSize = new Vector3(.09f, .9f, .08f);
+                buttonPos = new Vector3(.56f, 0, .28f);
+                buttonOffset = 1.15f;
+                //buttonTextPos = new Vector3(.064f, 0f, .111f);
+                //buttonTextOffset = 2.9f;
+                buttonFontStyle = FontStyle.Italic;
+                titleFontStyle = FontStyle.BoldAndItalic;
+                pageSize = 8;
+                toolTipZ = -.34f;
+                menuTitleZ = .163f;
+            }
+            else if (Mode[23] == 5) // ii temp
+            {
+                parentSize = new Vector3(.1f, .3f, .3825f);
+                pageButtonSize = new Vector3(.09f, .2f, .9f);
+                pagePoss[0] = new Vector3(.56f, .65f, 0);
+                pagePoss[1] = new Vector3(.56f, -.65f, 0);
+                menuSize = new Vector3(.1f, 1f, 1f);
+                menuPos = new Vector3(.05f, 0, 0);
+                buttonSize = new Vector3(.09f, .9f, .08f);
+                buttonPos = new Vector3(.56f, 0, .28f);
+                buttonOffset = 1;
+                //buttonTextPos = new Vector3(.064f, 0, .111f);
+                //buttonTextOffset = 2.6f;
+                buttonFontStyle = FontStyle.Italic;
+                titleFontStyle = FontStyle.Italic;
+                pageSize = 7;
+                toolTipZ = -.17f;
+                menuTitleZ = .165f;
+                nextPageText = ">";
+                lastPageText = "<";
+                disconnectSize = new Vector3(.09f, .9f, .08f);
+                disconnectPos = new Vector3(.56f, 0, .6f);
+                internalButtonOffset = .1f;
+            }
+            else if (Mode[23] == 6) // kman temp
+            {
+                parentSize = new Vector3(.1f, .3f, .4f);
+                pageButtonSize = new Vector3(.09f, .15f, .98f);
+                pagePoss[0] = new Vector3(.56f, .5833f, -.13f);
+                pagePoss[1] = new Vector3(.56f, -.5833f, -.13f);
+                menuSize = new Vector3(.1f, .94f, 1.2f);
+                menuPos = new Vector3(.05f, 0, -.03f);
+                buttonSize = new Vector3(.09f, .8f, .08f);
+                buttonPos = new Vector3(.56f, 0, .29f);
+                buttonOffset = 1f;
+                //buttonTextPos = new Vector3(.064f, 0, .111f);
+                //buttonTextOffset = 2.6f;
+                buttonFontStyle = FontStyle.Italic;
+                titleFontStyle = FontStyle.Italic;
+                pageSize = 7;
+                toolTipZ = -.25f;
+                menuTitleZ = .175f;
+                nextPageText = ">";
+                lastPageText = "<";
+                disconnectSize = new Vector3(.09f, .94f, .08f);
+                disconnectPos = new Vector3(.56f, 0, .6f);
+                internalButtonOffset = .13f;
+            }
+            else if (Mode[23] == 7) // mango / shiba temp
+            {
+                pageButtonSize = new Vector3(.09f, .8f, .08f);
+                pagePoss[0] = new Vector3(.56f, 0, .28f);
+                pagePoss[1] = new Vector3(.56f, 0, .15f);
+                menuSize = new Vector3(.1f, 1, 1);
+                menuPos = new Vector3(.05f, 0, 0);
+                buttonSize = new Vector3(.09f, .8f, .08f);
+                buttonPos = new Vector3(.56f, 0, .02f);
+                buttonOffset = 1f;
+                //buttonTextPos = new Vector3(.064f, 0, .111f);
+                //buttonTextOffset = 2.6f;
+                buttonFontStyle = FontStyle.Italic;
+                titleFontStyle = FontStyle.Italic;
+                pageSize = 4;
+                toolTipZ = -.18f;
+                menuTitleZ = .175f;
+                nextPageText = $"Next >> [{pageNumber + 1}]";
+                lastPageText = $"[{pageNumber - 1}] << Prev";
+                disconnectSize = new Vector3(0.045f, 0.66f, 0.17f);
+                disconnectPos = new Vector3(0.50f, -1.122f, .1f);
+            }
+            else if (Mode[23] == 8) // sial temp?
+            {
+                parentSize = new Vector3(.1f, .3f, .4f);
+                pageButtonSize = new Vector3(.09f, .12f, .75f);
+                pagePoss[0] = new Vector3(0.56f, .625f, 0);
+                pagePoss[1] = new Vector3(0.56f, -.625f, 0);
+                menuSize = new Vector3(.1f, 1, 1.1f);
+                menuPos = new Vector3(.05f, 0, -.004f);
+                buttonSize = new Vector3(.09f, .92f, .08f);
+                buttonPos = new Vector3(.56f, 0, .28f);
+                buttonOffset = 1f;
+                //buttonTextPos = new Vector3(.064f, 0f, .112f);
+                //buttonTextOffset = 2.55f; // 3.05
+                buttonFontStyle = FontStyle.Normal;
+                titleFontStyle = FontStyle.Normal;
+                pageSize = 7;
+                toolTipZ = -.18f;
+                menuTitleZ = .175f;
+                nextPageText = ">";
+                lastPageText = "<";
+                disconnectSize = new Vector3(0.045f, 0.66f, 0.17f);
+                disconnectPos = new Vector3(0.50f, -1.122f, .1f);
+            }
+            /*if (Mode[23] == 9) // paypal
+            {
+                parentSize = new Vector3(.1f, .3f, .4f);
+                pageButtonSize = new Vector3(.09f, .2f, .1f);
+                pagePoss[0] = new Vector3(.5f, .4f, 0.53f);
+                pagePoss[1] = new Vector3(.5f, -.4f, 0.53f);
+                menuSize = new Vector3(.1f, 1, .9f);
+                menuPos = new Vector3(0.05f, 0, 0);
+                buttonSize = new Vector3(.09f, .2f, .1f);
+                buttonPos = new Vector3(0, .1f, 0);
+                buttonOffset = 1f;
+                internalButtonOffset = .1f;
+                buttonFontStyle = FontStyle.Normal;
+                titleFontStyle = FontStyle.Normal;
+                pageSize = 8;
+                toolTipZ = -.18f;
+                menuTitleZ = .175f;
+                nextPageText = "";
+                lastPageText = "";
+                disconnectSize = new Vector3(.09f, .5f, .1f);
+                disconnectPos = new Vector3(.5f, 0, -.53f);
+            }*/
+            else if (Mode[23] == 9) // wide
+            {
+                parentSize = new Vector3(.1f, .3f, .4f);
+                pageButtonSize = new Vector3(0.045f, 0.25f, 0.064295f);
+                pagePoss[0] = new Vector3(0.56f, 0.65f, 0.45f);
+                pagePoss[1] = new Vector3(0.56f, -0.65f, 0.45f);
+                menuSize = new Vector3(.1f, 1.6f, 1f);
+                menuPos = new Vector3(0.05f, 0f, -0.05f);
+                buttonSize = new Vector3(.09f, 1.4f, .08f);
+                buttonPos = new Vector3(.56f, 0, .23f);
+                buttonOffset = 1.2f;
+                //buttonTextPos = new Vector3(.064f, 0f, .089f);
+                //buttonTextOffset = 3f;
+                buttonFontStyle = FontStyle.Italic;
+                titleFontStyle = FontStyle.BoldAndItalic;
+                pageSize = 8;
+                toolTipZ = -.24f;
+                menuTitleZ = .133f;
+                nextPageText = "";
+                lastPageText = "";
+                disconnectSize = new Vector3(.09f, .9f, .08f);
+                disconnectPos = new Vector3(.56f, 0, .45f);
+            }
+            else if (Mode[23] == 10) // really wide
             {
                 pageButtonSize = new Vector3(0.045f, 0.25f, 0.064295f);
                 pagePoss[0] = new Vector3(0.56f, 0.65f, 0.45f);
                 pagePoss[1] = new Vector3(0.56f, -0.65f, 0.45f);
+                menuSize = new Vector3(.1f, 5f, 1f);
+                buttonSize = new Vector3(.09f, 4.8f, .08f);
+                buttonPos = new Vector3(.56f, 0, .23f);
+                buttonOffset = 1.2f;
+                //buttonTextPos = new Vector3(.064f, 0f, .089f);
+                //buttonTextOffset = 3f;
+                pageSize = 8;
+                toolTipZ = -.24f;
+                menuTitleZ = .133f;
+            }
+            else if (Mode[23] == 11) // long
+            {
+                parentSize = new Vector3(.1f, .3f, .4f);
+                pageButtonSize = new Vector3(0.045f, 0.25f, 0.064295f);
+                pagePoss[0] = new Vector3(0.56f, 0.37f, 0.55f);
+                pagePoss[1] = new Vector3(0.56f, -0.37f, 0.55f);
+                menuSize = new Vector3(.1f, 1, 2f);
+                menuPos = new Vector3(.05f, 0, -.205f);
+                buttonSize = new Vector3(.09f, .8f, .08f);
+                buttonPos = new Vector3(.56f, 0, .29f);
+                buttonOffset = 1f;
+                internalButtonOffset = .13f;
+                //buttonTextPos = new Vector3(.064f, 0f, .112f);
+                //buttonTextOffset = 2.55f; // 3.05
+                buttonFontStyle = FontStyle.Normal;
+                titleFontStyle = FontStyle.Normal;
+                pageSize = 13;
+                toolTipZ = -.58f;
+                menuTitleZ = .173f;
+                nextPageText = "";
+                lastPageText = "";
+                disconnectSize = new Vector3(0.045f, 0.66f, 0.17f);
+                disconnectPos = new Vector3(0.50f, -1.122f, .1f);
             }
         }
-        private static void ThatGuyTemplate()
+
+        public static void SetUpKeyboard()
         {
-            menuSize = new Vector3(.1f, 1, 1);
-            buttonSize = new Vector3(.09f, .8f, .08f);
-            buttonPos = new Vector3(.56f, 0, .19f);
-            buttonOffset = 1;
-            buttonTextPos = new Vector3(.064f, 0, .076f);
-            buttonTextOffset = 2.55f;
-            buttonFontStyle = FontStyle.Italic;
-            titleFontStyle = FontStyle.BoldAndItalic;
-            pageSize = 6;
-            toolTipZ = -.22f;
-            menuTitleZ = .125f;
+            keyboard.transform.position = menu.transform.position - new Vector3(0, .4f, .5f);
+            keyboard.transform.rotation = menu.transform.rotation;
+            SetUpKeyboardKeys();
         }
-        private static void MysticTemplate()
+
+        public static string inputtext = "";
+        private static List<GameObject> keys = new List<GameObject>();
+        private static void SetUpKeyboardKeys()
         {
-            menuSize = new Vector3(.1f, 1, 1.2f);
-            buttonSize = new Vector3(.09f, .8f, .08f);
-            buttonPos = new Vector3(.56f, 0, .29f);
-            buttonOffset = 1f;
-            buttonTextPos = new Vector3(.064f, 0f, .111f);
-            buttonTextOffset = 2.6f; // 3.05
-            buttonFontStyle = FontStyle.Normal;
-            titleFontStyle = FontStyle.Normal;
-            pageSize = 8;
-            toolTipZ = -.27f;
-            menuTitleZ = .173f;
+            keys.Clear();
+            for (int i = 0; i < keyboard.transform.childCount; i++)
+            {
+                var key = keyboard.transform.GetChild(i).gameObject;
+                keys.Add(key);
+                if (key.GetComponentInChildren<TextMesh>())
+                {
+                    var btn = key.AddComponent<KeyboardButton>();
+                    key.GetComponentInChildren<TextMesh>().font = currentFont;
+                    var keyText = key.GetComponentInChildren<TextMesh>().text;
+                    if (keyText == "<--") { btn.buttonAction =()=> { if (inputtext.Length > 0) inputtext = inputtext.Substring(0, inputtext.Length - 1); }; }
+                    else if (keyText == ">>>>>") btn.buttonAction =()=> Toggle("NextPage");
+                    else if (keyText == "<<<<<") btn.buttonAction = () => Toggle("PreviousPage");
+                    else { btn.buttonText = keyText == "____" ? " " : keyText; btn.buttonAction =()=> inputtext += btn.buttonText; }
+                }
+            }
         }
-        public static void AZTemplate()
+
+        // thanks chatgpt
+        public static string[] systemColorNames =
         {
-            menuSize = new Vector3(.1f, 1, 1.5f);
-            buttonSize = new Vector3(.09f, .9f, .08f);
-            buttonPos = new Vector3(.56f, 0, .28f);
-            buttonOffset = 1.15f;
-            buttonTextPos = new Vector3(.064f, 0f, .111f);
-            buttonTextOffset = 2.9f;
-            buttonFontStyle = FontStyle.Italic;
-            titleFontStyle = FontStyle.BoldAndItalic;
-            pageSize = 8;
-            toolTipZ = -.34f;
-            menuTitleZ = .163f;
-        }
-        public static void KFJTemplate() // fix this
+            "Transparent", "AliceBlue", "AntiqueWhite", "Aqua", "Aquamarine", "Azure",
+            "Beige", "Bisque", "Black", "BlanchedAlmond", "Blue", "BlueViolet",
+            "Brown", "BurlyWood", "CadetBlue", "Chartreuse", "Chocolate", "Coral",
+            "CornflowerBlue", "Cornsilk", "Crimson", "Cyan", "DarkBlue", "DarkCyan",
+            "DarkGoldenrod", "DarkGray", "DarkGreen", "DarkKhaki", "DarkMagenta",
+            "DarkOliveGreen", "DarkOrange", "DarkOrchid", "DarkRed", "DarkSalmon",
+            "DarkSeaGreen", "DarkSlateBlue", "DarkSlateGray", "DarkTurquoise",
+            "DarkViolet", "DeepPink", "DeepSkyBlue", "DimGray", "DodgerBlue",
+            "Firebrick", "FloralWhite", "ForestGreen", "Fuchsia", "Gainsboro",
+            "GhostWhite", "Gold", "Goldenrod", "Gray", "Green", "GreenYellow",
+            "Honeydew", "HotPink", "IndianRed", "Indigo", "Ivory", "Khaki",
+            "Lavender", "LavenderBlush", "LawnGreen", "LemonChiffon", "LightBlue",
+            "LightCoral", "LightCyan", "LightGoldenrodYellow", "LightGray",
+            "LightGreen", "LightPink", "LightSalmon", "LightSeaGreen",
+            "LightSkyBlue", "LightSlateGray", "LightSteelBlue", "LightYellow",
+            "Lime", "LimeGreen", "Linen", "Magenta", "Maroon", "MediumAquamarine",
+            "MediumBlue", "MediumOrchid", "MediumPurple", "MediumSeaGreen",
+            "MediumSlateBlue", "MediumSpringGreen", "MediumTurquoise",
+            "MediumVioletRed", "MidnightBlue", "MintCream", "MistyRose",
+            "Moccasin", "NavajoWhite", "Navy", "OldLace", "Olive", "OliveDrab",
+            "Orange", "OrangeRed", "Orchid", "PaleGoldenrod", "PaleGreen",
+            "PaleTurquoise", "PaleVioletRed", "PapayaWhip", "PeachPuff", "Peru",
+            "Pink", "Plum", "PowderBlue", "Purple", "Red", "RosyBrown",
+            "RoyalBlue", "SaddleBrown", "Salmon", "SandyBrown", "SeaGreen",
+            "SeaShell", "Sienna", "Silver", "SkyBlue", "SlateBlue", "SlateGray",
+            "Snow", "SpringGreen", "SteelBlue", "Tan", "Teal", "Thistle",
+            "Tomato", "Turquoise", "Violet", "Wheat", "White", "WhiteSmoke",
+            "Yellow", "YellowGreen"
+        };
+
+        public static SColor[] scolor =
         {
-            menuSize = new Vector3(.1f, 1.6f, 1f);
-            buttonSize = new Vector3(.09f, 1.4f, .08f);
-            buttonPos = new Vector3(.56f, 0, .23f);
-            buttonOffset = 1.2f;
-            buttonTextPos = new Vector3(.064f, 0f, .089f);
-            buttonTextOffset = 3f;
-            buttonFontStyle = FontStyle.Italic;
-            titleFontStyle = FontStyle.BoldAndItalic;
-            pageSize = 8;
-            toolTipZ = -.24f;
-            menuTitleZ = .133f;
-        }
+            SColor.Transparent, SColor.AliceBlue, SColor.AntiqueWhite, SColor.Aqua, SColor.Aquamarine, SColor.Azure,
+            SColor.Beige, SColor.Bisque, SColor.Black, SColor.BlanchedAlmond, SColor.Blue, SColor.BlueViolet,
+            SColor.Brown, SColor.BurlyWood, SColor.CadetBlue, SColor.Chartreuse, SColor.Chocolate, SColor.Coral,
+            SColor.CornflowerBlue, SColor.Cornsilk, SColor.Crimson, SColor.Cyan, SColor.DarkBlue, SColor.DarkCyan,
+            SColor.DarkGoldenrod, SColor.DarkGray, SColor.DarkGreen, SColor.DarkKhaki, SColor.DarkMagenta,
+            SColor.DarkOliveGreen, SColor.DarkOrange, SColor.DarkOrchid, SColor.DarkRed, SColor.DarkSalmon,
+            SColor.DarkSeaGreen, SColor.DarkSlateBlue, SColor.DarkSlateGray, SColor.DarkTurquoise,
+            SColor.DarkViolet, SColor.DeepPink, SColor.DeepSkyBlue, SColor.DimGray, SColor.DodgerBlue,
+            SColor.Firebrick, SColor.FloralWhite, SColor.ForestGreen, SColor.Fuchsia, SColor.Gainsboro,
+            SColor.GhostWhite, SColor.Gold, SColor.Goldenrod, SColor.Gray, SColor.Green, SColor.GreenYellow,
+            SColor.Honeydew, SColor.HotPink, SColor.IndianRed, SColor.Indigo, SColor.Ivory, SColor.Khaki,
+            SColor.Lavender, SColor.LavenderBlush, SColor.LawnGreen, SColor.LemonChiffon, SColor.LightBlue,
+            SColor.LightCoral, SColor.LightCyan, SColor.LightGoldenrodYellow, SColor.LightGray,
+            SColor.LightGreen, SColor.LightPink, SColor.LightSalmon, SColor.LightSeaGreen,
+            SColor.LightSkyBlue, SColor.LightSlateGray, SColor.LightSteelBlue, SColor.LightYellow,
+            SColor.Lime, SColor.LimeGreen, SColor.Linen, SColor.Magenta, SColor.Maroon, SColor.MediumAquamarine,
+            SColor.MediumBlue, SColor.MediumOrchid, SColor.MediumPurple, SColor.MediumSeaGreen,
+            SColor.MediumSlateBlue, SColor.MediumSpringGreen, SColor.MediumTurquoise,
+            SColor.MediumVioletRed, SColor.MidnightBlue, SColor.MintCream, SColor.MistyRose,
+            SColor.Moccasin, SColor.NavajoWhite, SColor.Navy, SColor.OldLace, SColor.Olive, SColor.OliveDrab,
+            SColor.Orange, SColor.OrangeRed, SColor.Orchid, SColor.PaleGoldenrod, SColor.PaleGreen,
+            SColor.PaleTurquoise, SColor.PaleVioletRed, SColor.PapayaWhip, SColor.PeachPuff, SColor.Peru,
+            SColor.Pink, SColor.Plum, SColor.PowderBlue, SColor.Purple, SColor.Red, SColor.RosyBrown,
+            SColor.RoyalBlue, SColor.SaddleBrown, SColor.Salmon, SColor.SandyBrown, SColor.SeaGreen,
+            SColor.SeaShell, SColor.Sienna, SColor.Silver, SColor.SkyBlue, SColor.SlateBlue, SColor.SlateGray,
+            SColor.Snow, SColor.SpringGreen, SColor.SteelBlue, SColor.Tan, SColor.Teal, SColor.Thistle,
+            SColor.Tomato, SColor.Turquoise, SColor.Violet, SColor.Wheat, SColor.White, SColor.WhiteSmoke,
+            SColor.Yellow, SColor.YellowGreen
+        };
     }
 }

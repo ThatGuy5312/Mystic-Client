@@ -13,6 +13,15 @@ using System.Reflection;
 using System.Linq;
 using OculusSampleFramework;
 using MysticClient.Patches;
+using static ThrowableBug;
+using UnityEngine.Animations.Rigging;
+using Valve.VR;
+using System.Collections.Generic;
+using Viveport;
+using static SteamVR_Utils;
+using WebSocketSharp;
+using System.Diagnostics;
+using UnityEngine.UI;
 
 namespace MysticClient.Mods
 {
@@ -21,24 +30,307 @@ namespace MysticClient.Mods
         // RigUtils.MyPlayer.transform.position + new Vector3(Mathf.Cos(Time.frameCount / 30f), 0f, Mathf.Sin(Time.frameCount / 30f)); orbit
         // Quaternion.Euler(new Vector3(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f))); spaz
 
-        public static void SpamThingo()
+
+
+        public static Texture2D mcBlockTexture = MCTextures[0];
+        public static AudioClip mcSongClip = AudioClips[9];
+        #region minecraft
+        public static void PlayMinecraftSong(bool toStop)
         {
-            if (UserInput.GetMouseButton(0) || Controller.rightGrab)
-            {
-                RPCManager.DropPiece(-566818631, RigUtils.MyOnlineRig.rightHandTransform.position, RigUtils.MyOnlineRig.rightHandTransform.rotation);
-                RPCProtection(true);
-            }
+            if (toStop)
+                Loaders.MCObject.Stop();
+            else Loaders.PlayMCAudio(mcSongClip);
         }
-        public static void DestroyBlockGun()
+
+        private static float addColliderDelay = 0f;
+        public static void AddMCBlockCollider()
         {
             if (CreateGun(out RaycastHit hit))
             {
-                var piece = hit.collider.GetComponentInParent<BuilderPiece>();
-                if (piece)
+                var obj = hit.collider.gameObject;
+                if (Time.time > addColliderDelay && obj && gridParent != null)
                 {
-                    BuilderTable.instance.RequestRecyclePiece(piece, true, 2);
-                    RPCProtection(true);
+                    try
+                    {
+                        if (obj.transform.IsChildOf(gridParent.transform))
+                        {
+                            obj.layer = 0;
+                            addColliderDelay = Time.time + .2f;
+                        }
+                    }
+                    catch { }
                 }
+            }
+        }
+        private static float destroyColliderDelay = 0f;
+        public static void RemoveMCBlockCollider()
+        {
+            if (CreateGun(out RaycastHit hit))
+            {
+                var obj = hit.collider.gameObject;
+                if (Time.time > destroyColliderDelay && obj && gridParent != null)
+                {
+                    try
+                    {
+                        if (obj.transform.IsChildOf(gridParent.transform))
+                        {
+                            obj.layer = 8;
+                            destroyColliderDelay = Time.time + .2f;
+                        }
+                    }
+                    catch { }
+                }
+            }
+        }
+
+        private static float destroyDelay = 0f;
+        public static void DestroyMCBlockGun()
+        {
+            if (CreateGun(out RaycastHit hit))
+            {
+                var obj = hit.collider.gameObject;
+                if (Time.time > destroyDelay && obj && gridParent != null)
+                {
+                    try // i dont like seeing errors
+                    {
+                        if (obj.transform.IsChildOf(gridParent.transform))
+                        {
+                            Destroy(obj);
+                            destroyDelay = Time.time + .2f;
+                        }
+                    }
+                    catch { }
+                }
+            }
+        }
+        private static List<GameObject> MinecraftCubes = new List<GameObject>();
+        private static GameObject gridParent;
+        private static GameObject placePos = null;
+        private static float blockPlaceCooldown;
+        private static LineRenderer mcLineRenderer;
+        public static void ClearMCCubes(string btnname)
+        {
+            if (Controller.rightControllerPrimaryButton || UserInput.GetMouseButton(0))
+                foreach (var obj in MinecraftCubes)
+                    { Destroy(obj); GetIndex(btnname).enabled = false; }
+            else if (Controller.rightControllerSecondaryButton || UserInput.GetMouseButton(1))
+                GetIndex(btnname).enabled = false;
+            else
+                NotifiLib.SendNotification(NotifUtils.Menu() + "If You Want To Continue Press A To Comfirm Or Press B To Cancel", 5f);
+        }
+        public static void Minecraft()
+        {
+            if (Controller.rightGrab || UserInput.GetMouseButton(1))
+            {
+                if (mcLineRenderer == null)
+                {
+                    var obj = new GameObject("MCLineRenderer");
+                    mcLineRenderer = obj.AddComponent<LineRenderer>();
+                    mcLineRenderer.material = TransparentMaterial(GetChangeColorA(Color.Lerp(MenuSettings.NormalColor, Color.gray, Mathf.PingPong(Time.time, 1f)), .2f));
+                    mcLineRenderer.startWidth = .05f;
+                    mcLineRenderer.endWidth = .05f;
+                }
+                mcLineRenderer.material = TransparentMaterial(GetChangeColorA(Color.Lerp(MenuSettings.NormalColor, Color.gray, Mathf.PingPong(Time.time, 1f)), .2f));
+                mcLineRenderer.SetPosition(0, RigUtils.MyPlayer.rightControllerTransform.position);
+                mcLineRenderer.SetPosition(1, RigUtils.MyPlayer.rightControllerTransform.position + RigUtils.MyPlayer.rightControllerTransform.forward);
+                if (gridParent == null)
+                    gridParent = new GameObject("GridParent");
+                var pos = RoundToGrid(mcLineRenderer.GetPosition(1));
+                if (Time.time > blockPlaceCooldown)
+                {
+                    if (Controller.rightControllerIndexFloat.TriggerDown() || UserInput.GetMouseButton(0))
+                    {
+                        var block = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                        if (mcBlockTexture == MCTextures[8])
+                            block.GetComponent<Renderer>().material.shader = DefaultShader;
+                        else if (mcBlockTexture == MCTextures[10])
+                            block.GetComponent<Renderer>().material = TransparentMaterial(GetChangeColorA(Color.white, .5f));
+                        else
+                            block.GetComponent<Renderer>().material.shader = UniversalShader;
+                        block.GetComponent<Renderer>().material.mainTexture = mcBlockTexture;
+                        block.transform.position = pos;
+                        block.transform.parent = gridParent.transform;
+                        MinecraftCubes.Add(block);
+                        blockPlaceCooldown = Time.time + .1f;
+                    }
+                }
+                if (!Controller.rightControllerIndexFloat.TriggerDown() || !UserInput.GetMouseButton(0))
+                {
+                    if (placePos == null)
+                        placePos = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    Destroy(placePos.GetComponent<Collider>());
+                    placePos.GetComponent<Renderer>().material = TransparentMaterial(GetChangeColorA(Color.Lerp(Color.white, Color.gray, Mathf.PingPong(Time.time, 1f)), .2f));
+                    placePos.GetComponent<Renderer>().material.mainTexture = mcBlockTexture;
+                    placePos.transform.position = pos;
+                    placePos.transform.parent = gridParent.transform;
+                }
+            }
+            else
+            {
+                if (mcLineRenderer != null)
+                    Destroy(mcLineRenderer.gameObject);
+                if (placePos != null)
+                    Destroy(placePos);
+                mcLineRenderer = null;
+                placePos = null;
+            }
+        }
+
+        public class CubeManager : MonoBehaviour { public int cubeID; }
+
+        #endregion
+
+        public static void BlockHalo(string tooltip)
+        {
+            if (PhotonSystem.InRoom)
+            {
+                if (ZoneManagement.instance.IsZoneActive(GTZone.monkeBlocks))
+                {
+                    var rad = 1f;
+                    var count = 8;
+                    for (int i = 0; i < count; i++)
+                    {
+                        float angle = (i * 360f / count) + Time.time * 90f; // did this so if your using the mystic gui free cam this will still work
+                        var pos = RigUtils.MyOnlineRig.rigidbody.useGravity ? RigUtils.MyPlayer.transform.position : RigUtils.MyOfflineRig.transform.position + new Vector3(
+                            Mathf.Cos(angle * Mathf.Deg2Rad) * rad, 0, Mathf.Sin(angle * Mathf.Deg2Rad) * rad);
+                        RPCManager.PieceEvent(gotPieceType, pos, RigUtils.MyOnlineRig.rightHandTransform.rotation);
+                    }
+                }
+                else
+                {
+                    NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not In The Monke Blocks Map");
+                    GetToolTip(tooltip).enabled = false;
+                }
+            }
+            else
+            {
+                NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not In A Room");
+                GetToolTip(tooltip).enabled = false;
+            }
+        }
+        public static void SpamBlock(string tooltip)
+        {
+            if (PhotonSystem.InRoom)
+            {
+                if (ZoneManagement.instance.IsZoneActive(GTZone.monkeBlocks))
+                {
+                    if (UserInput.GetMouseButton(0) || Controller.rightGrab)
+                    {
+                        RPCManager.PieceEvent(gotPieceType, RigUtils.MyOnlineRig.rightHandTransform.position, RigUtils.MyOnlineRig.rightHandTransform.rotation);
+                        RPCProtection(false);
+                    }
+                }
+                else
+                {
+                    NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not In The Monke Blocks Map");
+                    GetToolTip(tooltip).enabled = false;
+                }
+            }
+            else
+            {
+                NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not In A Room");
+                GetToolTip(tooltip).enabled = false;
+            }
+        }
+        public static void SpamBlockGun(string tooltip)
+        {
+            if (PhotonSystem.InRoom)
+            {
+                if (ZoneManagement.instance.IsZoneActive(GTZone.monkeBlocks))
+                {
+                    if (CreateGun())
+                    {
+                        RPCManager.PieceEvent(gotPieceType, pointer.transform.position, pointer.transform.rotation);
+                        RPCProtection(true);
+                    }
+                }
+                else
+                {
+                    NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not In The Monke Blocks Map");
+                    GetToolTip(tooltip).enabled = false;
+                }
+            }
+            else
+            {
+                NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not In A Room");
+                GetToolTip(tooltip).enabled = false;
+            }
+        }
+        public static void SpamBlockRandom(string tooltip)
+        {
+            if (PhotonSystem.InRoom)
+            {
+                if (ZoneManagement.instance.IsZoneActive(GTZone.monkeBlocks))
+                {
+                    if (UserInput.GetMouseButton(0) || Controller.rightGrab)
+                    {
+                        RPCManager.PieceEvent(GetPieces().ToArray()[Random.Range(0, GetPieces().Length)].pieceType, RigUtils.MyOnlineRig.rightHandTransform.position, RigUtils.MyOnlineRig.rightHandTransform.rotation);
+                        RPCProtection(true);
+                    }
+                }
+                else
+                {
+                    NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not In The Monke Blocks Map");
+                    GetToolTip(tooltip).enabled = false;
+                }
+            }
+            else
+            {
+                NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not In A Room");
+                GetToolTip(tooltip).enabled = false;
+            }
+        }
+        public static void DestroyBlockGun(string tooltip)
+        {
+            if (PhotonSystem.InRoom)
+            {
+                if (ZoneManagement.instance.IsZoneActive(GTZone.monkeBlocks))
+                {
+                    if (CreateGun(out RaycastHit hit))
+                    {
+                        var piece = hit.collider.GetComponentInParent<BuilderPiece>();
+                        if (piece)
+                        {
+                            BuilderTable.instance.RequestRecyclePiece(piece, true, 2);
+                            RPCProtection(true);
+                        }
+                    }
+                }
+                else
+                {
+                    NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not In The Monke Blocks Map");
+                    GetToolTip(tooltip).enabled = false;
+                }
+            }
+            else
+            {
+                NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not In A Room");
+                GetToolTip(tooltip).enabled = false;
+            }
+        }
+        private static int gotPieceType = -566818631;
+        public static void GetBlockIDGun(string tooltip)
+        {
+            if (PhotonSystem.InRoom)
+            {
+                if (ZoneManagement.instance.IsZoneActive(GTZone.monkeBlocks))
+                {
+                    if (CreateGun(out RaycastHit hit))
+                    {
+                        var piece = hit.collider.GetComponentInParent<BuilderPiece>();
+                        if (piece) { gotPieceType = piece.pieceType; NotifiLib.SendNotification(NotifUtils.Success() + $"Copied Piece ID {gotPieceType} To Int32", 1f); }
+                    }
+                }
+                else
+                {
+                    NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not In The Monke Blocks Map");
+                    GetToolTip(tooltip).enabled = false;
+                }
+            }
+            else
+            {
+                NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not In A Room");
+                GetToolTip(tooltip).enabled = false;
             }
         }
         public static void GliderHalo()
@@ -63,7 +355,7 @@ namespace MysticClient.Mods
         }
         public static void SpazGliders()
         {
-            if (Controller.rightControllerIndexFloat > .3f || UserInput.GetMouseButton(0))
+            if (Controller.rightControllerIndexFloat.TriggerDown() || UserInput.GetMouseButton(0))
                 foreach (var gliders in Gliders())
                     if (gliders.GetView.Owner == RigUtils.MyRealtimePlayer)
                     {
@@ -75,7 +367,7 @@ namespace MysticClient.Mods
         }
         public static void SpinGliders()
         {
-            if (Controller.rightControllerIndexFloat > .3f || UserInput.GetMouseButton(0))
+            if (Controller.rightControllerIndexFloat.TriggerDown() || UserInput.GetMouseButton(0))
                 foreach (var gliders in Gliders())
                     if (gliders.GetView.Owner == RigUtils.MyRealtimePlayer)
                     {
@@ -88,13 +380,13 @@ namespace MysticClient.Mods
         }
         public static void GainVelocity()
         {
-            if (Controller.rightControllerIndexFloat > 0.3f || UserInput.GetMouseButton(1))
+            if (Controller.rightControllerIndexFloat.TriggerDown() || UserInput.GetMouseButton(1))
             {
                 RigUtils.MyPlayer.bodyCollider.attachedRigidbody.velocity += RigUtils.MyPlayer.headCollider.transform.forward * Time.deltaTime * Movement.flySpeed;
                 var rigidbody = RigUtils.MyPlayer.bodyCollider.attachedRigidbody;
                 rigidbody.AddForce(new Vector3(0f, 25f, 0f), ForceMode.Impulse);
             }
-            if (Controller.leftControllerIndexFloat > 0.3f || UserInput.GetMouseButton(0))
+            if (Controller.leftControllerIndexFloat.TriggerDown() || UserInput.GetMouseButton(0))
             {
                 RigUtils.MyPlayer.bodyCollider.attachedRigidbody.velocity -= RigUtils.MyPlayer.headCollider.transform.up * Time.deltaTime * Movement.flySpeed;
                 var rigidbody = RigUtils.MyPlayer.bodyCollider.attachedRigidbody;
@@ -385,17 +677,13 @@ namespace MysticClient.Mods
             BatteryAcid.GetComponent<ThrowableBug>().allowWorldSharableInstance = true;
             BatteryAcid.GetComponent<ThrowableBug>().WorldShareableRequestOwnership();
         }
-        public static void SetOfflineColor(Color color)
-        {
-            RigUtils.MyOfflineRig.mainSkin.material.color = color;
-        }
+        public static void SetOfflineColor(Color color) => RigUtils.MyOfflineRig.mainSkin.material.color = color;
         public static void PlatformGun()
         {
             if (CreateGun())
             {
                 var plat = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 plat.name = "Plats";
-                plat.layer = 8;
                 plat.transform.localScale = Movement.scale;
                 plat.transform.position = pointer.transform.position;
                 var content = new object[] 
@@ -404,7 +692,7 @@ namespace MysticClient.Mods
                     Movement.platformPhysics, Movement.platfromSingleColor, Movement.platColorKeys, Movement.PlatColor
                 };
                 LegacySendEvent(110, content, new RaiseEventOptions { Receivers = ReceiverGroup.Others }, true);
-                if (Movement.platformPhysics) { var platRB = plat.AddComponent(typeof(Rigidbody)) as Rigidbody; platRB.velocity = Physics.gravity; }
+                if (Movement.platformPhysics) { var platRB = plat.AddComponent(typeof(Rigidbody)) as Rigidbody; platRB.velocity = Physics.gravity; plat.layer = 8; }
                 if (!Movement.platfromSingleColor)
                 {
                     var colorChanger = plat.AddComponent<ColorChanger>();
@@ -422,9 +710,23 @@ namespace MysticClient.Mods
         }
         private static SnowballThrowable[] GetThrowables()
         {
-            if (throwables == null)
-                throwables = Resources.FindObjectsOfTypeAll<SnowballThrowable>();
+            throwables ??= Resources.FindObjectsOfTypeAll<SnowballThrowable>();
             return throwables;
+        }
+        public static void GiveWaterBender(string btnname) // not working
+        {
+            if (PhotonSystem.InRoom)
+            {
+                if (CreateGun(out VRRig rig))
+                {
+                    RigUtils.MyOfflineRig.enabled = false;
+                    RigUtils.MyOfflineRig.transform.position = -rig.transform.forward;
+                    RigUtils.MyNetworkView.transform.position = -rig.transform.forward;
+                    RPCManager.WaterEvent(RpcTarget.All, rig.rightHandTransform.position, rig.rightHandTransform.rotation);
+                    RPCManager.WaterEvent(RpcTarget.All, rig.leftHandTransform.position, rig.leftHandTransform.rotation);
+                    RPCProtection();
+                } else RigUtils.MyOfflineRig.enabled = true;
+            } else { GetIndex(btnname).enabled = false; NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not Connected To A Lobby"); }
         }
         public static void WaterRight(string btnname)
         {
@@ -435,8 +737,7 @@ namespace MysticClient.Mods
                     RPCManager.WaterEvent(RpcTarget.All, RigUtils.MyOnlineRig.rightHandTransform.position, RigUtils.MyOnlineRig.rightHandTransform.rotation);
                     RPCProtection();
                 }
-            }
-            else { GetIndex(btnname).enabled = false; NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not Connected To A Lobby"); }
+            } else { GetIndex(btnname).enabled = false; NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not Connected To A Lobby"); }
         }
         public static void WaterLeft(string btnname)
         {
@@ -447,26 +748,9 @@ namespace MysticClient.Mods
                     RPCManager.WaterEvent(RpcTarget.All, RigUtils.MyOnlineRig.leftHandTransform.position, RigUtils.MyOnlineRig.leftHandTransform.rotation);
                     RPCProtection();
                 }
-            }
-            else { GetIndex(btnname).enabled = false; NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not Connected To A Lobby"); }
+            } else { GetIndex(btnname).enabled = false; NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not Connected To A Lobby"); }
         }
-        public static void WaterBender(string btnname)
-        {
-            if (PhotonSystem.InRoom)
-            {
-                if (Controller.rightGrab || UserInput.GetMouseButton(1))
-                {
-                    RPCManager.WaterEvent(RpcTarget.All, RigUtils.MyOnlineRig.rightHandTransform.position, RigUtils.MyOnlineRig.rightHandTransform.rotation);
-                    RPCProtection();
-                }
-                if (Controller.leftGrab || UserInput.GetMouseButton(0))
-                {
-                    RPCManager.WaterEvent(RpcTarget.All, RigUtils.MyOnlineRig.leftHandTransform.position, RigUtils.MyOnlineRig.leftHandTransform.rotation);
-                    RPCProtection();
-                }
-            }
-            else { GetIndex(btnname).enabled = false; NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not Connected To A Lobby"); }
-        }
+        public static void WaterBender(string btnname) { WaterRight(btnname); WaterLeft(btnname); }
         public static void WaterGun(string btnname)
         {
             if (PhotonSystem.InRoom)
@@ -483,44 +767,24 @@ namespace MysticClient.Mods
         }
         public static void PlayTagSound(int index, string btnname)
         {
-            /*if (PhotonSystem.InRoom)
-            {
-                if (PhotonSystem.IsMasterClient)
-                {
-                    if (Controller.rightControllerIndexFloat > 0.3f || UserInput.GetMouseButton(0))
-                    {
-                        RPCManager.TagSoundEvent(NetEventOptions.RecieverTarget.all, new object[]
-                        {
-                            index,
-                            99999999f
-                        });
-                        RPCProtection();
-                    }
-                }
-                else { GetIndex(btnname).enabled = false; NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not Master Client"); }
-            }
-            else { GetIndex(btnname).enabled = false; NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not Connected To A Lobby"); }*/
-            if (Controller.rightControllerIndexFloat > 0.3f || UserInput.GetMouseButton(0))
+            if (Controller.rightControllerIndexFloat.TriggerDown() || UserInput.GetMouseButton(0))
             {
                 RPCManager.TagSoundEvent(NetEventOptions.RecieverTarget.all, new object[]
                 {
-                        index,
-                        99999999f
+                    index,
+                    float.MaxValue,
+                    false
                 });
                 RPCProtection();
             }
         }
         public static void PlaySound(int index, string btnname)
         {
-            if (PhotonSystem.InRoom)
+            if (Controller.rightControllerIndexFloat.TriggerDown() || UserInput.GetMouseButton(0))
             {
-                if (Controller.rightControllerIndexFloat > 0.3f || UserInput.GetMouseButton(0))
-                {
-                    RPCManager.SoundEvent(RpcTarget.All, index, true, float.MaxValue);
-                    RPCProtection();
-                }
+                RPCManager.SoundEvent(RpcTarget.All, index, true, float.MaxValue);
+                RPCProtection();
             }
-            else { GetIndex(btnname).enabled = false; NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not Connected To A Lobby"); }
         }
         public static void BallsGun()
         {
@@ -591,7 +855,8 @@ namespace MysticClient.Mods
             void OnTriggerEnter()
             {
                 RigUtils.MyOnlineRig.transform.position = EnderBall.transform.position;
-                RigUtils.MyOnlineRig.GetComponent<Rigidbody>().velocity = new Vector3(0f, 0f ,0f);
+                RigUtils.MyOnlineRig.GetComponent<Rigidbody>().velocity = Vector3.zero;
+                RigUtils.MyOfflineRig.PlayHandTapLocal(84, true, 999);
                 Destroy(EnderBall);
                 EnderBall = null;
             }

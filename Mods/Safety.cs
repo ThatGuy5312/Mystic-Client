@@ -22,14 +22,12 @@ namespace MysticClient.Mods
                     {
                         metaReport.enabled = true;
                         metaReport.gameObject.SetActive(true);
-                        metaReport.Invoke("StartOverlay", 0.1f);
+                        metaReport.Invoke("StartOverlay", .1f);
                     }
-                    else
-                        NotifiLib.SendNotification(NotifUtils.Warning() + "You Are Already In The Meta Report Menu");
-            else
-                NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not On Your VR Headset");
+                    else NotifiLib.SendNotification(NotifUtils.Warning() + "You Are Already In The Meta Report Menu");
+            else NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not On Your VR Headset");
         }
-        public static void AntiReport()
+        public static void AntiReport() // thanks drew
         {
             try
             {

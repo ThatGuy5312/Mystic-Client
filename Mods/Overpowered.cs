@@ -6,11 +6,127 @@ using Photon.Pun;
 using MysticClient.Classes;
 using MysticClient.Notifications;
 using UnityEngine.Animations.Rigging;
+using GorillaLocomotion.Gameplay;
+using static ThrowableBug;
 
 namespace MysticClient.Mods
 {
     public class Overpowered : GunLib
     {
+        public static void SpazRopeGun(string btnname)
+        {
+            if (PhotonSystem.InRoom)
+            {
+                if (CreateGun(out RaycastHit hit))
+                {
+                    var rope = hit.collider.GetComponentInParent<GorillaRopeSwing>();
+                    if (rope)
+                    {
+                        var force = new Vector3(Random.Range(-50f, 50f), Random.Range(-50f, 50f), Random.Range(-50f, 50f));
+                        RPCManager.RopeEvent(force, rope, RpcTarget.All);
+                        RPCProtection();
+                    }
+                }
+            }
+            else
+            {
+                NotifiLib.SendNotification(NotifUtils.Error() + "YOU ARE NOT IN A ROOM");
+                GetIndex(btnname).enabled = false;
+            }
+        }
+        public static void RopeSpaz(string btnname)
+        {
+            if (PhotonSystem.InRoom)
+            {
+                if (Controller.rightControllerIndexFloat.TriggerDown() || UserInput.GetMouseButton(0))
+                {
+                    var force = new Vector3(Random.Range(-50f, 50f), Random.Range(-50f, 50f), Random.Range(-50f, 50f));
+                    RPCManager.RopeEvent(force, RpcTarget.All);
+                    RPCProtection();
+                }
+            }
+            else
+            {
+                NotifiLib.SendNotification(NotifUtils.Error() + "YOU ARE NOT IN A ROOM");
+                GetIndex(btnname).enabled = false;
+            }
+        }
+        public static void RopeDownGun(string btnname)
+        {
+            if (PhotonSystem.InRoom)
+            {
+                if (CreateGun(out RaycastHit hit))
+                {
+                    var rope = hit.collider.GetComponentInParent<GorillaRopeSwing>();
+                    if (rope)
+                    {
+                        var force = new Vector3(0, -50, 0);
+                        RPCManager.RopeEvent(force, rope, RpcTarget.All);
+                        RPCProtection();
+                    }
+                }
+            }
+            else
+            {
+                NotifiLib.SendNotification(NotifUtils.Error() + "YOU ARE NOT IN A ROOM");
+                GetIndex(btnname).enabled = false;
+            }
+        }
+        public static void RopeDown(string btnname)
+        {
+            if (PhotonSystem.InRoom)
+            {
+                if (Controller.rightControllerIndexFloat.TriggerDown() || UserInput.GetMouseButton(0))
+                {
+                    var force = new Vector3(0, -50, 0);
+                    RPCManager.RopeEvent(force, RpcTarget.All);
+                    RPCProtection();
+                }
+            }
+            else
+            {
+                NotifiLib.SendNotification(NotifUtils.Error() + "YOU ARE NOT IN A ROOM");
+                GetIndex(btnname).enabled = false;
+            }
+        }
+        public static void RopeUpGun(string btnname)
+        {
+            if (PhotonSystem.InRoom)
+            {
+                if (CreateGun(out RaycastHit hit))
+                {
+                    var rope = hit.collider.GetComponentInParent<GorillaRopeSwing>();
+                    if (rope)
+                    {
+                        var force = new Vector3(0, 50, 0);
+                        RPCManager.RopeEvent(force, rope, RpcTarget.All);
+                        RPCProtection();
+                    }
+                }
+            }
+            else
+            {
+                NotifiLib.SendNotification(NotifUtils.Error() + "YOU ARE NOT IN A ROOM");
+                GetIndex(btnname).enabled = false;
+            }
+        }
+        public static void RopeUp(string btnname)
+        {
+            if (PhotonSystem.InRoom)
+            {
+                if (Controller.rightControllerIndexFloat.TriggerDown() || UserInput.GetMouseButton(0))
+                {
+                    var force = new Vector3(0, 50, 0);
+                    RPCManager.RopeEvent(force, RpcTarget.All);
+                    RPCProtection();
+                }
+            }
+            else
+            {
+                NotifiLib.SendNotification(NotifUtils.Error() + "YOU ARE NOT IN A ROOM");
+                GetIndex(btnname).enabled = false;
+            }
+        }
         public static void GliderBlindGun()
         {
             if (CreateGun(out VRRig rig))
@@ -38,7 +154,7 @@ namespace MysticClient.Mods
                     glider.OnHover(null, null);
             }
         }
-        /*public static void SlowGun(string tooltip)
+        public static void SlowGun(string tooltip)
         {
             if (PhotonSystem.InRoom)
             {
@@ -131,7 +247,7 @@ namespace MysticClient.Mods
                 NotifiLib.SendNotification(NotifUtils.Error() + "YOU ARE NOT IN A ROOM");
                 GetToolTip(tooltip).enabled = false;
             }
-        }*/
+        }
         public static void TagAura(string tooltip)
         {
             if (PhotonSystem.InRoom)
@@ -143,13 +259,8 @@ namespace MysticClient.Mods
                         if (!IsTagged(RigUtils.GetNetFromRig(rigs)))
                         {
                             if (PhotonSystem.IsMasterClient)
-                            {
-                                int players = PhotonSystem.AllNetPlayers.Length;
-                                if (players == 1 || players == 2 || players == 3)
-                                    AddInfected(RigUtils.GetNetFromRig(RigUtils.GetClosestVRRig(3f)));
-                                else
-                                    AddInfected(RigUtils.GetNetFromRig(RigUtils.GetClosestVRRig(int.MaxValue)));
-                            } else RigUtils.MyPlayer.rightControllerTransform.position = RigUtils.GetClosestVRRig(3f).transform.position;
+                                AddInfected(RigUtils.GetNetFromRig(RigUtils.GetClosestVRRig(3f)));
+                            else RigUtils.MyPlayer.rightControllerTransform.position = RigUtils.GetClosestVRRig(3f).transform.position;
                         }
                     }
                 }
@@ -244,10 +355,7 @@ namespace MysticClient.Mods
                             RemoveInfected(RigUtils.GetNetFromRig(rig));
                             NotifiLib.SendNotification(NotifUtils.Success() + $"Player {RigUtils.GetNetFromRig(rig).NickName} Has Been Un-Tagged");
                         }
-                        else
-                        {
-                            NotifiLib.SendNotification(NotifUtils.Warning() + $"Player {RigUtils.GetNetFromRig(rig).NickName} Is Already Un-Tagged");
-                        }
+                        else NotifiLib.SendNotification(NotifUtils.Warning() + $"Player {RigUtils.GetNetFromRig(rig).NickName} Is Already Un-Tagged");
                     }
                     else
                     {
@@ -274,11 +382,7 @@ namespace MysticClient.Mods
                         {
                             AddInfected(RigUtils.GetNetFromRig(rig));
                             NotifiLib.SendNotification(NotifUtils.Success() + $"Player {rig.playerName} Has Been Tagged");
-                        }
-                        else
-                        {
-                            NotifiLib.SendNotification(NotifUtils.Success() + $"Player {rig.playerName} Is Already Tagged");
-                        }
+                        } else NotifiLib.SendNotification(NotifUtils.Success() + $"Player {rig.playerName} Is Already Tagged");
                     }
                     else
                     {
@@ -286,16 +390,12 @@ namespace MysticClient.Mods
                         {
                             LockOnRig(rig);
                             RigUtils.MyOfflineRig.enabled = false;
-                            RigUtils.MyOfflineRig.transform.position = rig.transform.position - new Vector3(0, 3, 0);
-                            RigUtils.MyNetworkView.transform.position = rig.transform.position - new Vector3(0, 3, 0);
-                            RigUtils.MyPlayer.rightControllerTransform.position = rig.transform.position;
-                        }
-                        else
-                        {
-                            NotifiLib.SendNotification(NotifUtils.Success() + $"Player {rig.playerName} Has Been Tagged Or Already Was Tagged");
-                        }
+                            RigUtils.MyOfflineRig.rightHandTransform.SetPosition(rig.Position());
+                            RigUtils.MyOfflineRig.leftHandTransform.SetPosition(rig.Position());
+                            RigUtils.MyOfflineRig.transform.SetPosition(rig.Position());
+                        } else NotifiLib.SendNotification(NotifUtils.Success() + $"Player {rig.playerName} Has Been Tagged Or Already Was Tagged");
                     }
-                }
+                } else { if (!PhotonSystem.IsMasterClient) RigUtils.MyOfflineRig.enabled = true; }
             }
             else
             {
@@ -349,42 +449,23 @@ namespace MysticClient.Mods
                 }
                 else
                 {
-                    if (!IsTagged(PhotonSystem.LocalPlayer))
-                    {
-                        GetToolTip(tooltip).enabled = false;
-                        NotifiLib.SendNotification(NotifUtils.Error() + "YOU MUST BE TAGGED OR MASTER");
-                    }
-                    else
-                    {
-                        foreach (var players in PhotonSystem.PlayerListOthers)
+                    if (Controller.rightControllerPrimaryButton)
+                    {   
+                        if (!IsTagged(PhotonSystem.LocalPlayer))
                         {
-                            foreach (var rigs in RigUtils.VRRigs)
-                            {
-                                bool allTagged = false;
-                                if (!IsTagged(players))
-                                {
-                                    allTagged = true;
-                                    break;
-                                }
-                                if (allTagged)
-                                {
-                                    if (!IsTagged(players))
-                                    {
-                                        RigUtils.MyOfflineRig.enabled = false;
-                                        RigUtils.MyOfflineRig.transform.position = rigs.transform.position;
-                                        RigUtils.MyNetworkView.transform.position = rigs.transform.position;
-                                        RigUtils.MyPlayer.rightControllerTransform.position = rigs.transform.position;
-                                    }
-                                }
-                                else
-                                {
-                                    RigUtils.MyOfflineRig.enabled = true;
-                                    NotifiLib.SendNotification(NotifUtils.Success() + "Everyone Has Been Tagged Or They Were Already Tagged");
-                                    GetToolTip(tooltip).enabled = false;
-                                }
-                            }
+                            GetToolTip(tooltip).enabled = false;
+                            NotifiLib.SendNotification(NotifUtils.Error() + "YOU MUST BE TAGGED OR MASTER");
                         }
-                    }
+                        else
+                            foreach (var players in PhotonSystem.PlayerListOthers)
+                                foreach (var rigs in RigUtils.VRRigs)
+                                {
+                                    RigUtils.MyOfflineRig.enabled = false;
+                                    RigUtils.MyOfflineRig.transform.position = rigs.transform.position + new Vector3(0, 2, 0);
+                                    RigUtils.MyPlayer.rightControllerTransform.position = rigs.transform.position;
+                                    RigUtils.MyPlayer.leftControllerTransform.position = rigs.transform.position;
+                                }
+                    } else RigUtils.MyOfflineRig.enabled = true;
                 }
             }
             else

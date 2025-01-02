@@ -15,14 +15,9 @@ namespace MysticClient.Classes
     {
         public static bool NetworkColliders;
         private static bool[] networked = new bool[9999];
-        private static void AddNetwork(Action<EventData> function)
-        {
-            PhotonNetwork.NetworkingClient.EventReceived += function;
-        }
-        private static void RemoveNetwork(Action<EventData> function)
-        {
-            PhotonNetwork.NetworkingClient.EventReceived -= function;
-        }
+        private static void AddNetwork(Action<EventData> function) => PhotonNetwork.NetworkingClient.EventReceived += function;
+        private static void RemoveNetwork(Action<EventData> function) => PhotonNetwork.NetworkingClient.EventReceived -= function;
+
         public static void NetworkPlatforms()
         {
             if (!networked[0])
@@ -115,10 +110,7 @@ namespace MysticClient.Classes
         }
         public static void DestroyNetworkedObjects()
         {
-            string[] names = { "PlatNetwork", "PlatGunNetwork", "BALLSNetwork" };
-            foreach (var name in names)
-                if (GameObject.Find(name).activeSelf)
-                    Main.DestroyObjectsByName(name);
+            
         }
         /*public static void RaiseNetwork(string code, object content, RaiseEventOptions reo, bool reliable)
         {
@@ -134,7 +126,7 @@ namespace MysticClient.Classes
             if (code == 69)
             {
                 object[] array = (object[])eventData.CustomData;
-                jump_left_network[eventData.Sender] = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                jump_left_network[eventData.Sender] = GameObject.CreatePrimitive((bool)array[6] ? PrimitiveType.Sphere : PrimitiveType.Cube);
                 if (NetworkColliders) // i know theres a better way but it doesnt work
                     jump_left_network[eventData.Sender].GetComponent<Collider>().enabled = true;
                 else
@@ -143,6 +135,7 @@ namespace MysticClient.Classes
                 jump_left_network[eventData.Sender].transform.localScale = (Vector3)array[2];
                 jump_left_network[eventData.Sender].transform.position = (Vector3)array[0];
                 jump_left_network[eventData.Sender].transform.rotation = (Quaternion)array[1];
+                jump_left_network[eventData.Sender].GetComponent<Renderer>().enabled = !(bool)array[7];
                 if (!(bool)array[3])
                 {
                     var colorChanger = jump_left_network[eventData.Sender].AddComponent<ColorChanger>();
@@ -156,7 +149,7 @@ namespace MysticClient.Classes
             if (code == 70)
             {
                 object[] array = (object[])eventData.CustomData;
-                jump_right_network[eventData.Sender] = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                jump_right_network[eventData.Sender] = GameObject.CreatePrimitive((bool)array[6] ? PrimitiveType.Sphere : PrimitiveType.Cube);
                 if (NetworkColliders)
                     jump_right_network[eventData.Sender].GetComponent<Collider>().enabled = true;
                 else
@@ -165,6 +158,7 @@ namespace MysticClient.Classes
                 jump_right_network[eventData.Sender].transform.localScale = (Vector3)array[2];
                 jump_right_network[eventData.Sender].transform.position = (Vector3)array[0];
                 jump_right_network[eventData.Sender].transform.rotation = (Quaternion)array[1];
+                jump_right_network[eventData.Sender].GetComponent<Renderer>().enabled = !(bool)array[7];
                 if (!(bool)array[3])
                 {
                     var colorChanger = jump_right_network[eventData.Sender].AddComponent<ColorChanger>();
@@ -317,82 +311,26 @@ namespace MysticClient.Classes
                 Destroy(frozone_left_network[eventData.Sender], 1);
             }
         }
-        /*[PunRPC] all this just to not use it
-        public static void RPC_LaunchSlingshotProjectile(int projHash, int trailHash, Vector3 pos, Vector3 vel, Color col, float size) =>
-            ProjectileLib.LaunchProjectile(new object[] { projHash, trailHash, pos, vel, col, size });
-        [PunRPC]
-        public static void RPC_CreateCube(Vector3 scale, Vector3 pos, Quaternion rot, bool singleColor, GradientColorKey[] gradient, Color hardColor)
+        public static void SendCube(object[] data) // next update
         {
-            var obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            obj.GetComponent<Collider>().enabled = NetworkColliders;
-            obj.name = $"Platform_{RigUtils.MyNetPlayer.NickName}";
-            obj.transform.localScale = scale;
-            obj.transform.localPosition = pos;
-            obj.transform.localRotation = rot;
-            if (singleColor)
+            var others = new RaiseEventOptions { Receivers = ReceiverGroup.Others };
+            Main.LegacySendEvent(112, data, others, true);
+        }
+        private static void MinecraftNetwork(EventData eventData)
+        {
+            if (eventData.Code == 112)
             {
-                var changer = obj.AddComponent<ColorChanger>();
-                changer.colors = new Gradient { colorKeys = gradient };
-                changer.loop = true;
+                var array = (object[])eventData.CustomData;
+                var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                cube.transform.position = (Vector3)array[0];
+                cube.transform.rotation = (Quaternion)array[1];
+                cube.GetComponent<Renderer>().material.shader = Shader.Find((string)array[2]);
+                cube.GetComponent<Renderer>().material.mainTexture = Main.MCTextures[(int)array[3]];
             }
-            else obj.GetComponent<Renderer>().material.color = hardColor;
-        }
-        [PunRPC]
-        public static void RPC_CreateRigidCube(Vector3 scale, Vector3 pos, Quaternion rot, bool singleColor, GradientColorKey[] gradient, Color hardColor, Vector3 vel)
-        {
-            var obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            obj.GetComponent<Collider>().enabled = NetworkColliders;
-            obj.name = $"RigidPlatform_{RigUtils.MyNetPlayer.NickName}";
-            obj.transform.localScale = scale;
-            obj.transform.localPosition = pos;
-            obj.transform.localRotation = rot;
-            if (singleColor)
+            if (eventData.Code == 113)
             {
-                var changer = obj.AddComponent<ColorChanger>();
-                changer.colors = new Gradient { colorKeys = gradient };
-                changer.loop = true;
+
             }
-            else obj.GetComponent<Renderer>().material.color = hardColor;
-            var objRB = obj.AddComponent(typeof(Rigidbody)) as Rigidbody;
-            objRB.velocity = vel;
         }
-        [PunRPC]
-        public static void RPC_CreateOverrideCube(Vector3 scale, Vector3 pos, Quaternion rot, bool singleColor, GradientColorKey[] gradient, Color hardColor, int indexOverride)
-        {
-            var obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            obj.GetComponent<Collider>().enabled = NetworkColliders;
-            obj.AddComponent<GorillaSurfaceOverride>().overrideIndex = indexOverride;
-            obj.name = $"OverridePlatform_{RigUtils.MyNetPlayer.NickName}";
-            obj.transform.localScale = scale;
-            obj.transform.localPosition = pos;
-            obj.transform.localRotation = rot;
-            if (singleColor)
-            {
-                var changer = obj.AddComponent<ColorChanger>();
-                changer.colors = new Gradient { colorKeys = gradient };
-                changer.loop = true;
-            }
-            else obj.GetComponent<Renderer>().material.color = hardColor;
-        }
-        [PunRPC]
-        public static void Mystic_BallGunSphere(Vector3 scale, Vector3 pos, Quaternion rot, Color hardColor, Vector3 vel)
-        {
-            var obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            obj.GetComponent<Collider>().enabled = NetworkColliders;
-            obj.name = $"BallSpherePlatform_{RigUtils.MyNetPlayer.NickName}";
-            obj.transform.localScale = scale;
-            obj.transform.localPosition = pos;
-            obj.transform.localRotation = rot;
-            obj.GetComponent<Renderer>().material.color = hardColor;
-            var objRB = obj.AddComponent(typeof(Rigidbody)) as Rigidbody;
-            objRB.velocity = vel;
-        }
-        [PunRPC]
-        public static void RPC_DestroyCube(string name)
-        {
-            var obj = Main.GetObjectByNames(new string[] { name });
-            if (obj.activeSelf)
-                obj.SetActive(false);
-        }*/
     }
 }

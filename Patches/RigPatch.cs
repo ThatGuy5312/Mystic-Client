@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using MysticClient.Utils;
 using UnityEngine;
 
 namespace MysticClient.Patches
@@ -8,7 +9,7 @@ namespace MysticClient.Patches
     {
         public static bool Prefix(VRRig __instance)
         {
-            return !(__instance == GorillaTagger.Instance.offlineVRRig);
+            return !(__instance == RigUtils.MyOfflineRig);
         }
     }
 }

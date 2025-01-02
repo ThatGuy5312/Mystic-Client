@@ -6,68 +6,81 @@ using System.Reflection;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.Video;
 
 namespace MysticClient.Utils
 {
     public class Loaders : MonoBehaviour
     {
-        public static float AudioVolume = 0.2f;
+        public static float AudioVolume = .3f;
         public static bool loopAudio = false;
-        private static GameObject Object = null;
-        private static GameObject GetObject = null;
+        public static AudioSource Object = null;
+        public static AudioSource MCObject = null;
         public static Texture2D LoadTexture(string path)
         {
             var texture = new Texture2D(2, 2);
-            var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(path);
+            using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(path);
             if (stream != null)
             {
                 var data = new byte[stream.Length];
                 stream.Read(data, 0, data.Length);
                 texture.LoadImage(data);
-            } else Debug.LogError($"Failed to load texure from resource {path}");
-            return texture;
+                return texture;
+            }
+            return null;
+        }
+        public static GameObject LoadGameObject(string path, string name)
+        {
+            using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(path); if (stream == null) return null;
+            return Instantiate(AssetBundle.LoadFromStream(stream).LoadAsset<GameObject>(name));
         }
         public static AssetBundle LoadAsset(string path)
         {
-            var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(path);
-            var bundle = AssetBundle.LoadFromStream(stream);
-            stream.Close();
-            return bundle;
+            using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(path); if (stream == null) return null;
+            return AssetBundle.LoadFromStream(stream);
         }
         public static AudioClip GetAudioFromURL(string MP3Link)
         {
-            using (var webRequest = UnityWebRequestMultimedia.GetAudioClip(MP3Link, AudioType.MPEG))
-            {
-                var operation = webRequest.SendWebRequest();
-                while (!operation.isDone) { }
-                if (webRequest.result != UnityWebRequest.Result.Success) { Debug.LogError($"Failed to download audio sclip: {webRequest.error}"); }
-                return DownloadHandlerAudioClip.GetContent(webRequest);
-            }
+            using var webRequest = UnityWebRequestMultimedia.GetAudioClip(MP3Link, AudioType.MPEG);
+            var operation = webRequest.SendWebRequest();
+            while (!operation.isDone) { }
+            if (webRequest.result != UnityWebRequest.Result.Success) { Debug.LogError($"Failed to download audio clip: {webRequest.error}"); }
+            return DownloadHandlerAudioClip.GetContent(webRequest);
         }
-        public static void PlayAudio(string MP3Link) // made by @anthonyzfrfr cleaned up by me
+        public static Texture2D LoadImageFromURL(string url)
         {
-            using (var webRequest = UnityWebRequestMultimedia.GetAudioClip(MP3Link, AudioType.MPEG))
-            {
-                webRequest.SendWebRequest();
-                var Audio = DownloadHandlerAudioClip.GetContent(webRequest);
-                if (Object == null) { Object = new GameObject("Object"); }
-                Object.transform.position = RigUtils.MyOnlineRig.transform.position;
-                var audioSource = Object.AddComponent<AudioSource>();
-                audioSource.clip = Audio;
-                audioSource.loop = loopAudio;
-                audioSource.volume = AudioVolume;
-                audioSource.Play();
-            }
+            using var webRequest = UnityWebRequestTexture.GetTexture(url);
+            var operation = webRequest.SendWebRequest();
+            while (!operation.isDone) { }
+            if (webRequest.result != UnityWebRequest.Result.Success) { Debug.LogError($"Failed to download texture2d: {webRequest.error}"); }
+            return DownloadHandlerTexture.GetContent(webRequest);
         }
-        public static Texture2D LoadImage(string URLPath, string FileName)
+        public static void PlayAudio(AudioClip clip)
         {
-            var texture = new Texture2D(2, 2);
-            var client = new WebClient();
-            client.DownloadFile(URLPath, FileName);
-            var textureByte = File.ReadAllBytes(FileName);
-            texture.LoadImage(textureByte);
-            return texture;
+            if (Object == null) { Object = new GameObject().AddComponent<AudioSource>(); }
+            Object.transform.position = RigUtils.MyPlayer.transform.position;
+            Object.loop = loopAudio;
+            Object.volume = AudioVolume;
+            Object.PlayOneShot(clip);
         }
+        public static void PlayAudio(string MP3Link)
+        {
+            if (Object == null) { Object = new GameObject().AddComponent<AudioSource>(); }
+            Object.transform.position = RigUtils.MyPlayer.transform.position;
+            Object.clip = GetAudioFromURL(MP3Link);
+            Object.loop = loopAudio;
+            Object.volume = AudioVolume;
+            Object.Play();
+        }
+        public static void PlayMCAudio(AudioClip clip)
+        {
+            if (MCObject == null) { MCObject = new GameObject().AddComponent<AudioSource>(); }
+            MCObject.transform.position = RigUtils.MyPlayer.transform.position;
+            MCObject.loop = loopAudio;
+            MCObject.volume = AudioVolume;
+            MCObject.PlayOneShot(clip);
+        }
+
         // this is not used for anything harmful it's used to download extentions for the menu like the gui
         public static void InstallPlugin(string URLPath, string FileName, string tooltip)
         {
@@ -78,10 +91,7 @@ namespace MysticClient.Utils
                 File.Move(FileName, "BepInEx\\plugins");
                 Main.GetToolTip(tooltip).enabled = false;
             } 
-            else 
-            {
-                NotifiLib.SendNotification(NotifUtils.Warning() + $"File {FileName} already exist. try restarting your game to fix if the plugin if not working");
-            }
+            else NotifiLib.SendNotification(NotifUtils.Warning() + $"File {FileName} already exist. try restarting your game to fix if the plugin if not working");
         }
     }
 }

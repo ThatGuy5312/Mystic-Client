@@ -16,6 +16,7 @@ namespace MysticClient.Mods
             GorillaComputer.instance.savedName = PlayerName;
             GorillaComputer.instance.offlineVRRigNametagText.text = PlayerName;
             NetworkSystem.Instance.SetMyNickName(PlayerName);
+            ModIOMapsTerminal.RequestDriverNickNameRefresh();
             PlayerPrefs.SetString("playerName", PlayerName);
             PlayerPrefs.Save();
         }

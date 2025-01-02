@@ -27,61 +27,29 @@ namespace MysticClient.Mods
         }
         public static void WackyMonke()
         {
-            bool toggled = GetEnabled("Toggle Wacky Monke (RT)") && Controller.rightControllerIndexFloat > 0.3f ^ UserInput.GetMouseButton(0);
-            if (toggled || !toggled)
-            {
-                GorillaTagger.Instance.offlineVRRig.head.rigTarget.eulerAngles = new Vector3(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
-                GorillaTagger.Instance.offlineVRRig.leftHand.rigTarget.eulerAngles = new Vector3(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
-                GorillaTagger.Instance.offlineVRRig.rightHand.rigTarget.eulerAngles = new Vector3(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
-                GorillaTagger.Instance.offlineVRRig.head.rigTarget.eulerAngles = new Vector3(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
-                GorillaTagger.Instance.offlineVRRig.leftHand.rigTarget.eulerAngles = new Vector3(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
-                GorillaTagger.Instance.offlineVRRig.rightHand.rigTarget.eulerAngles = new Vector3(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
-            }
+            RigUtils.MyOfflineRig.head.rigTarget.eulerAngles = new Vector3(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
+            RigUtils.MyOfflineRig.leftHand.rigTarget.eulerAngles = new Vector3(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
+            RigUtils.MyOfflineRig.rightHand.rigTarget.eulerAngles = new Vector3(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
+            RigUtils.MyOfflineRig.head.rigTarget.eulerAngles = new Vector3(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
+            RigUtils.MyOfflineRig.leftHand.rigTarget.eulerAngles = new Vector3(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
+            RigUtils.MyOfflineRig.rightHand.rigTarget.eulerAngles = new Vector3(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
         }
         public static void SetArmLength(Vector3 Length) => RigUtils.MyPlayer.transform.localScale = Length;
         public static void HeadTask(string task)
         {
-            bool toggled = GetEnabled("Toggle Head Spin (RT)") && Controller.rightControllerIndexFloat > 0.3f ^ UserInput.GetMouseButton(0);
-            float spinSpeed = 12f;
+            var spinSpeed = 12f;
             if (task == "HeadSpinX")
-            {
-                if (toggled || !toggled)
-                {
-                    RigUtils.MyOfflineRig.head.trackingRotationOffset.x += spinSpeed;
-                }
-            }
+                RigUtils.MyOfflineRig.head.trackingRotationOffset.x += spinSpeed;
             else if (task == "HeadSpinY")
-            {
-                if (toggled || !toggled)
-                {
-                    RigUtils.MyOfflineRig.head.trackingRotationOffset.y += spinSpeed;
-                }
-            }
+                RigUtils.MyOfflineRig.head.trackingRotationOffset.y += spinSpeed;
             else if (task == "HeadSpinZ")
-            {
-                if (toggled || !toggled)
-                {
-                    RigUtils.MyOfflineRig.head.trackingRotationOffset.z += spinSpeed;
-                }
-            }
+                RigUtils.MyOfflineRig.head.trackingRotationOffset.z += spinSpeed;
             else if (task == "180 Head")
-            {
-                if (toggled || !toggled)
-                {
-                    RigUtils.MyOfflineRig.head.trackingRotationOffset.z = 180f;
-                }
-            }
+                RigUtils.MyOfflineRig.head.trackingRotationOffset.z = 180f;
             else if (task == "180 Y Head")
-            {
-                if (toggled || !toggled)
-                {
-                    RigUtils.MyOfflineRig.head.trackingRotationOffset.y = 180f;
-                }
-            }
+                RigUtils.MyOfflineRig.head.trackingRotationOffset.y = 180f;
             else if (task == "Fix Head")
-            {
                 RigUtils.MyOfflineRig.head.trackingRotationOffset = new Vector3(0f, 0f, 0f);
-            }
         }
         public static void GrabRig()
         {
@@ -93,35 +61,59 @@ namespace MysticClient.Mods
             } else RigUtils.MyOfflineRig.enabled = true;
         }
         public static int GhostType;
-        //private static bool ghostToggle;
-        //private static bool invisToggle;
-        //private static bool buttonHitG;
-        //private static bool buttonHitI;
+        private static bool ghostToggled;
+        private static bool invisToggled;
         public static void GhostMonke()
         {
             bool rp = Controller.rightControllerPrimaryButton || UserInput.GetMouseButton(0);
-            /*if (GetEnabled("Make Ghost/Invis Toggled"))
-                if (rp && !buttonHitG)
-                    ghostToggle = !ghostToggle;
-            else
-                RigUtils.MyOfflineRig.enabled = rp ? false : true;
-            RigUtils.MyOfflineRig.enabled = ghostToggle ? false : true;
-            buttonHitG = rp;*/
+            if (GetEnabled("Make Ghost/Invis Toggled"))
+            {
+                if (rp)
+                {
+                    if (!ghostToggled && RigUtils.MyOfflineRig.enabled)
+                    {
+                        RigUtils.MyOfflineRig.enabled = false;
+                        ghostToggled = true;
+                        return;
+                    }
+                    if (!ghostToggled && !RigUtils.MyOfflineRig.enabled)
+                    {
+                        RigUtils.MyOfflineRig.enabled = true;
+                        ghostToggled = true;
+                        return;
+                    }
+                } else ghostToggled = false;
+                return;
+            }
             RigUtils.MyOfflineRig.enabled = !rp;
         }
         public static void InvisMonke()
         {
             bool rp = Controller.rightControllerPrimaryButton || UserInput.GetMouseButton(0);
-            /*if (GetEnabled("Make Ghost/Invis Toggled"))
-                if (rp && !buttonHitI)
-                    invisToggle = !invisToggle;
+            if (GetEnabled("Make Ghost/Invis Toggled"))
+            {
+                if (rp)
+                {
+                    if (!invisToggled && RigUtils.MyOfflineRig.enabled)
+                    {
+                        RigUtils.MyOfflineRig.enabled = false;
+                        RigUtils.MyOfflineRig.transform.position = new Vector3(RigUtils.MyOfflineRig.transform.position.x, -100, RigUtils.MyOfflineRig.transform.position.z);
+                        invisToggled = true;
+                        return;
+                    }
+                    if (!invisToggled && !RigUtils.MyOfflineRig.enabled)
+                    {
+                        RigUtils.MyOfflineRig.enabled = true;
+                        invisToggled = true;
+                        return;
+                    }
+                } else invisToggled = false;
+            }
             else
-                RigUtils.MyOfflineRig.headBodyOffset = rp ? new Vector3(999f, 999f, 999f) : Vector3.zero;
-            //RigUtils.MyOfflineRig.enabled = rp ? false : true;
-            RigUtils.MyOfflineRig.headBodyOffset = invisToggle ? new Vector3(999f, 999f, 999f) : Vector3.zero;
-            buttonHitI = rp;*/
-            RigUtils.MyOfflineRig.transform.position = rp ? new Vector3(999f, 999f, 999f) : Vector3.zero;
-            RigUtils.MyOfflineRig.enabled = !rp;
+            {
+                RigUtils.MyOfflineRig.transform.position = rp ? new Vector3(RigUtils.MyOfflineRig.transform.position.x, -100, RigUtils.MyOfflineRig.transform.position.z) : Vector3.zero;
+                RigUtils.MyOfflineRig.enabled = !rp;
+            }
         }
     }
 }

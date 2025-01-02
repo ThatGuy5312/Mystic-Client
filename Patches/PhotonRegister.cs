@@ -53,7 +53,7 @@ namespace MysticClient.Patches
                 Protocol.Deserialize(out colorKey.color.b, data, ref offset);
                 Protocol.Deserialize(out colorKey.time, data, ref offset);
             }
-            catch (Exception ex) { Debug.LogError($"DeserializeGradientColorKey: Error during Deserialization - {ex.Message}"); return null; }
+            catch (Exception ex) { Debug.LogError($"DeserializeGradientColorKey: Error during Deserialization {ex.Message}"); return null; }
             return colorKey;
         }
 
