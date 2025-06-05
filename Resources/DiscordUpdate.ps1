@@ -4,7 +4,7 @@ param (
     [string]$filePath
 )
 
-$webhookUrl = "https://discord.com/api/webhooks/1337677067361189908/gEl4zQANQXAeo7ErltOapP9tvL9B91nRX8bWW-1nOJAmZAITGfwx1Iml55l-RGkXJFBz"
+$webhookUrl = "a discord webhook"
 
 # Debugging: Print file path
 Write-Host "File Path: $filePath"
