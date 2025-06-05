@@ -11,20 +11,24 @@ namespace MysticClient.Classes
 {
     public class RPCManager : MonoBehaviour
     {
-        public static void LagEvent(Player target)
+        public static void LagEvent(RpcTarget target, int power = 250)
         {
-            SendRPC(FriendshipGroupDetection.Instance.photonView, "RPC_NotifyNoPartyToMerge", target, new object[1]);
+            var view = GameObject.Find("Environment Objects/LocalObjects_Prefab/City_WorkingPrefab/Arcade_prefab/MainRoom/VRArea/ModIOArcadeTeleporter/NetObject_VRTeleporter").GetComponent<PhotonView>();
+            for (int i = 0; i < power; i++)
+                view.RPC("ActivateTeleportVFX", target, (short)Random.Range(0, 7));
         }
-        public static void LagEvent(RpcTarget target)
+        public static void LagEvent(Player target, int power = 250)
         {
-            SendRPC(FriendshipGroupDetection.Instance.photonView, "RPC_NotifyNoPartyToMerge", target, new object[1]);
+            var view = GameObject.Find("Environment Objects/LocalObjects_Prefab/City_WorkingPrefab/Arcade_prefab/MainRoom/VRArea/ModIOArcadeTeleporter/NetObject_VRTeleporter").GetComponent<PhotonView>();
+            for (int i = 0; i < power; i++)
+                view.RPC("ActivateTeleportVFX", target, (short)Random.Range(0, 7));
         }
         private static float dropDelay = 0f;
         public static void PieceEvent(int piece, Vector3 pos, Quaternion rot)
         {
             if (Time.time > dropDelay)
             {
-                BuilderTableNetworking.instance.RequestCreatePiece(piece, pos, rot, 1);
+                BuilderTable.instance.RequestCreatePiece(piece, pos, rot, 0);
                 dropDelay = Time.time + .2f;
             }
         }
@@ -72,6 +76,11 @@ namespace MysticClient.Classes
         }
         public static void WaterEvent(RpcTarget target, Vector3 pos, Quaternion rot)
         {
+            if (!PhotonSystem.InRoom)
+            {
+                RigUtils.MyOfflineRig.PlaySplashEffectLocal(pos, rot, 4f, 100f, true, false);
+                return;
+            }
             SendRPC(RigUtils.MyPhotonView, "RPC_PlaySplashEffect", target, new object[]
             {
                 pos,
@@ -84,6 +93,11 @@ namespace MysticClient.Classes
         }
         public static void WaterEvent(Player target, Vector3 pos, Quaternion rot)
         {
+            if (!PhotonSystem.InRoom)
+            {
+                RigUtils.MyOfflineRig.PlaySplashEffectLocal(pos, rot, 4f, 100f, true, false);
+                return;
+            }
             SendRPC(RigUtils.MyPhotonView, "RPC_PlaySplashEffect", target, new object[]
             {
                 pos,
@@ -156,11 +170,11 @@ namespace MysticClient.Classes
                 {
                     SendRPC(RopeSwingManager.instance.photonView, "SetVelocity", target, new object[]
                     {
-                    rope.ropeId,
-                    1,
-                    force,
-                    true,
-                    null
+                     rope.ropeId,
+                     1,
+                     force,
+                     true,
+                     null
                     });
                     ropeDelay = Time.time + .25f;
                 }
@@ -171,11 +185,11 @@ namespace MysticClient.Classes
             {
                 SendRPC(RopeSwingManager.instance.photonView, "SetVelocity", target, new object[]
                 {
-                    rope.ropeId,
-                    1,
-                    force,
-                    true,
-                    null
+                 rope.ropeId,
+                 1,
+                 force,
+                 true,
+                 null
                 });
                 ropeDelay = Time.time + .25f;
             }

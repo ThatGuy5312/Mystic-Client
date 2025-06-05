@@ -4,23 +4,22 @@ using System.IO;
 using MysticClient.Utils;
 using System;
 using BepInEx;
+using MysticClient.Mods;
 
 namespace MysticClient.Patches
 {
     [BepInPlugin("org.thatguy.networking.com", "PhotonRegister", "1.0.0")] // why
     public class PhotonRegister : BaseUnityPlugin
     {
-        void Awake()
-        {
-            RegisterCustomDataTypes();
-        }
+        void Awake() => RegisterCustomDataTypes();
 
         public static void RegisterCustomDataTypes()
         {
             PhotonPeer.RegisterType(typeof(GradientColorKey), 110, SerializeGradientColorKey, DeserializeGradientColorKey);
             PhotonPeer.RegisterType(typeof(ProjectileLib.ProjectileData), 111, SerializeProjectileData, DeserializeProjectileData);
             PhotonPeer.RegisterType(typeof(Color), 112, SerializeColor, DeserializeColor);
-            Debug.Log("Registering custom data types [UnityEngine.GradientColorKey, MysticClient.Utils.ProjectileLib.ProjectileData, UnityEngine.Color] to photon");
+            PhotonPeer.RegisterType(typeof(Fun.CubeManager), 113, SerializeCube, DeserializeCube);
+            Debug.Log("Registered custom data types [UnityEngine.GradientColorKey, MysticClient.Utils.ProjectileLib.ProjectileData, UnityEngine.Color, MysticClient.Mods.Fun.CubeManager] to photon");
         }
 
         private static byte[] SerializeGradientColorKey(object customObject)
@@ -88,6 +87,7 @@ namespace MysticClient.Patches
         {
             using var stream = new MemoryStream(data);
             using var reader = new BinaryReader(stream);
+
             var projectile = reader.ReadInt32();
 
             var trail = reader.ReadInt32();
@@ -133,6 +133,23 @@ namespace MysticClient.Patches
             }
             catch (Exception ex) { Debug.LogError($"DeserializeColor: Error during Deserialization - {ex.Message}"); return null; }
             return color;
+        }
+
+        private static byte[] SerializeCube(object customObject)
+        {
+            var data = (Fun.CubeManager)customObject;
+            using var stream = new MemoryStream();
+            using (var writer = new BinaryWriter(stream))
+                writer.Write(data.cubeID);
+            return stream.ToArray();
+        }
+
+        private static object DeserializeCube(byte[] data)
+        {
+            using var stream = new MemoryStream(data);
+            using var reader = new BinaryReader(stream);
+            var cubeID = reader.ReadString();
+            return new Fun.CubeManager { cubeID = cubeID };
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using BepInEx;
@@ -7,6 +8,8 @@ using MysticClient.Utils;
 using UnityEngine;
 using UnityEngine.UI;
 using static MysticClient.Menu.MenuSettings;
+using System.IO;
+
 
 namespace MysticClient.Notifications
 {
@@ -16,10 +19,8 @@ namespace MysticClient.Notifications
         private void Init()
         {
             MainCamera = GameObject.Find("Main Camera");
-            HUDObj = new GameObject();
-            HUDObj2 = new GameObject();
-            HUDObj2.name = "NOTIFICATIONLIB_HUD_OBJ";
-            HUDObj.name = "NOTIFICATIONLIB_HUD_OBJ";
+            HUDObj = new GameObject("NOTIFICATIONLIB_HUD_OBJ");
+            HUDObj2 = new GameObject("NOTIFICATIONLIB_HUD_OBJ");
             HUDObj.AddComponent<Canvas>();
             HUDObj.AddComponent<CanvasScaler>();
             HUDObj.AddComponent<GraphicRaycaster>();
@@ -31,7 +32,7 @@ namespace MysticClient.Notifications
             HUDObj2.transform.position = new Vector3(MainCamera.transform.position.x, MainCamera.transform.position.y, MainCamera.transform.position.z - 4.6f);
             HUDObj.transform.parent = HUDObj2.transform;
             HUDObj.GetComponent<RectTransform>().localPosition = new Vector3(0f, 0f, 1.6f);
-            Vector3 eulerAngles = HUDObj.GetComponent<RectTransform>().rotation.eulerAngles;
+            var eulerAngles = HUDObj.GetComponent<RectTransform>().rotation.eulerAngles;
             eulerAngles.y = -270f;
             HUDObj.transform.localScale = new Vector3(1f, 1f, 1f);
             HUDObj.GetComponent<RectTransform>().rotation = Quaternion.Euler(eulerAngles);
@@ -71,28 +72,21 @@ namespace MysticClient.Notifications
                     newtext = "";
                     NotificationDecayTimeCounter = 0;
                     Notifilines = Testtext.text.Split(Environment.NewLine.ToCharArray()).Skip(1).ToArray();
-                    foreach (string text in Notifilines)
-                    {
-                        if (text != "")
-                        {
-                            newtext = newtext + text + "\n";
-                        }
-                    }
+                    foreach (var text in Notifilines)
+                        if (text != "") newtext = newtext + text + "\n";
                     Testtext.text = newtext;
                 }
             }
-            else
-            {
-                NotificationDecayTimeCounter = 0;
-            }
+            else NotificationDecayTimeCounter = 0;
         }
 
-        public static void SendNotification(string NotificationText, bool playSound = true)
+        public static void SendNotification(string NotificationText, NotifUtils.MessageInfo messageInfo = NotifUtils.MessageInfo.None, bool playSound = true)
         {
             if (!disableNotifications)
             {
                 try
                 {
+                    NotificationText = NotifUtils.MessageText(messageInfo) + NotificationText;
                     if (IsEnabled && PreviousNotifi != NotificationText)
                     {
                         if (!NotificationText.Contains(Environment.NewLine))
@@ -102,6 +96,7 @@ namespace MysticClient.Notifications
                         NotifiText.text = NotifiText.text + NotificationText;
                         NotifiText.supportRichText = true;
                         PreviousNotifi = NotificationText;
+                        ScreenNotifs.SendOnScreenNotif(NotificationText);
                         if (Main.GetEnabled("Dynamic Sounds") && playSound)
                         {
                             if (NotificationText.Contains("ERROR"))
@@ -118,12 +113,13 @@ namespace MysticClient.Notifications
             }
         }
         private static float notifDelay = 0f;
-        public static void SendNotification(string NotificationText, float delay, bool playSound = true)
+        public static void SendNotification(string NotificationText, float delay, NotifUtils.MessageInfo messageInfo = NotifUtils.MessageInfo.None, bool playSound = true)
         {
             if (!disableNotifications)
             {
                 try
                 {
+                    NotificationText = NotifUtils.MessageText(messageInfo) + NotificationText;
                     if (IsEnabled && PreviousNotifi != NotificationText && Time.time > notifDelay)
                     {
                         if (!NotificationText.Contains(Environment.NewLine))
@@ -133,6 +129,7 @@ namespace MysticClient.Notifications
                         NotifiText.text = NotifiText.text + NotificationText;
                         NotifiText.supportRichText = true;
                         PreviousNotifi = NotificationText;
+                        ScreenNotifs.SendOnScreenNotif(NotificationText);
                         notifDelay = Time.time + delay;
                         if (Main.GetEnabled("Dynamic Sounds") && playSound)
                         {
@@ -194,5 +191,89 @@ namespace MysticClient.Notifications
         private static Text NotifiText;
 
         public static bool IsEnabled = true;
+    }
+    public class ScreenNotifs : MonoBehaviour
+    {
+        private static float decayTime = 3f;
+        private float slideSpeed = 500f;
+        public static float YStartPos = 60f;
+        private float slideOutDistance = 15f;
+
+        public static List<Notification> notifs = new List<Notification>();
+
+        public static Texture2D texture = null;
+
+        public static Vector2 size = new Vector2(300f, 50f);
+
+        void Handle()
+        {
+            for (int i = notifs.Count - 1; i >= 0; i--)
+            {
+                var notif = notifs[i];
+                notif.timer -= Time.deltaTime;
+                if (notif.slidingIn)
+                {
+                    if (notif.rect.x > Screen.width - size.x - slideOutDistance)
+                    {
+                        notif.rect.x -= slideSpeed * Time.deltaTime;
+                        if (notif.rect.x <= Screen.width - size.x - slideOutDistance)
+                        {
+                            notif.rect.x = Screen.width - size.x - slideOutDistance;
+                            notif.slidingIn = false;
+                        }
+                    }
+                }
+                else if (notif.timer <= 0)
+                {
+                    notif.rect.x += slideSpeed * Time.deltaTime;
+                    if (notif.rect.x >= Screen.width + slideOutDistance) notifs.RemoveAt(i);
+                }
+            }
+        }
+        void Update()
+        {
+            texture = MUtils.CreateRounded(NormalColor, (int)size.x, (int)size.y, 10);
+            Handle();
+        }
+        void OnGUI()
+        {
+            for (int i = 0; i < notifs.Count; i++)
+            {
+                var notif = notifs[i];
+                GUI.Box(notif.rect, notif.message, new GUIStyle(GUI.skin.box)
+                {
+                    alignment = TextAnchor.UpperLeft,
+                    padding = new RectOffset(10, 10, 10, 10),
+                    wordWrap = true,
+                    normal =
+                    {
+                        textColor = Color.white,
+                        background = texture
+                    }
+                });
+            }
+        }
+        public static void SendOnScreenNotif(string text)
+        {
+            var x = Screen.width + 10;
+            var y = Screen.height - YStartPos - (notifs.Count * (size.y + 10));
+            var newRect = new Rect(x, y, size.x, size.y);
+            var newNotif = new Notification(text, decayTime, newRect);
+            notifs.Add(newNotif);
+        }
+        public class Notification
+        {
+            public string message;
+            public float timer;
+            public Rect rect;
+            public bool slidingIn;
+            public Notification(string message, float timer, Rect rect)
+            {
+                this.message = message;
+                this.timer = timer;
+                this.rect = rect;
+                this.slidingIn = true;
+            }
+        }
     }
 }

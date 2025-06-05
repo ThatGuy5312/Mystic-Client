@@ -1,15 +1,14 @@
 ﻿using HarmonyLib;
-using MysticClient.Utils;
 using UnityEngine;
 
 namespace MysticClient.Patches
 {
-    [HarmonyPatch(typeof(VRRig), "OnDisable")]
-    internal class GhostPatch : MonoBehaviour
+    public class RigPatch : MonoBehaviour
     {
-        public static bool Prefix(VRRig __instance)
-        {
-            return !(__instance == RigUtils.MyOfflineRig);
-        }
+        [HarmonyPatch(typeof(VRRig), "OnDisable")]
+        private static bool Prefix(VRRig __instance) => !__instance.isOfflineVRRig;
+
+        [HarmonyPatch(typeof(VRRigJobManager), "DeregisterVRRig")]
+        private static bool Prefix(VRRigJobManager __instance, VRRig rig) => !rig.isOfflineVRRig;
     }
 }

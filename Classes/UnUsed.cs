@@ -1,10 +1,8 @@
 ﻿using MysticClient.Utils;
-using System;
 using Photon.Realtime;
 using static MysticClient.Menu.Main;
 using UnityEngine;
 using Photon.Pun;
-using Viveport;
 using System.Reflection;
 using GorillaNetworking;
 using System.Collections.Generic;
@@ -12,14 +10,80 @@ using MysticClient.Notifications;
 using Random = UnityEngine.Random;
 using HarmonyLib;
 using Unity.XR.CoreUtils;
-using Photon.Voice.PUN.UtilityScripts;
 using Fusion;
 
 namespace MysticClient.Classes
 {
-    [Obsolete("This Class Is Not Meant To Be Used It's Just Here To Hold Old Or Random Mods")]
     internal class UnUsed : MonoBehaviour
     {
+        public static void SendReport(NetPlayer player, string reportReason) // idk why i made this
+        {
+            var targetActors = (int[])typeof(GorillaNot).GetField("targetActors", BindingFlags.Static | BindingFlags.NonPublic).GetValue(GorillaNot.instance);
+            var flags = new WebFlags(1);
+            var options = new NetEventOptions
+            {
+                TargetActors = targetActors,
+                Reciever = NetEventOptions.RecieverTarget.master,
+                Flags = flags
+            };
+            var cachedPlayers = new string[GorillaNot.instance.cachedPlayerList.Length];
+            int index = 0;
+            foreach (var players in GorillaNot.instance.cachedPlayerList)
+            {
+                cachedPlayers[index] = players.UserId;
+                index++;
+            }
+            object[] data =
+            {
+                PhotonSystem.RoomStringStripped(),
+                cachedPlayers,
+                PhotonSystem.MasterClient.UserId,
+                player.UserId,
+                player.NickName,
+                reportReason
+            };
+            NetworkSystemRaiseEvent.RaiseEvent(8, data, options, true);
+        }
+        public static void SendProjectile() // you GYATT to try this its 100% und fr fr
+        {
+            var pos = RigUtils.MyOnlineRig.rightHandTransform.position;
+            var vel = RigUtils.MyPlayer.rightHandCenterVelocityTracker.GetAverageVelocity(true, 0f);
+            var color = new Color32(255, 255, 255, 255);
+            int counter = 0;
+            SendEvent(0, new object[]
+            {
+                pos,
+                vel,
+                0,
+                counter++,
+                false,
+                color.r,
+                color.g,
+                color.b,
+                color.a,
+            }, new NetEventOptions { Reciever = NetEventOptions.RecieverTarget.others }, false);
+            RPCProtection();
+        }
+        public static void LaunchProjectile(Vector3 pos, Vector3 vel, Color32 color) // und fr fr
+        {
+            int counter = 0;
+            var instance = MUtils.GetClass("RoomSystem").GetField("callbackInstance", BindingFlags.Static | BindingFlags.NonPublic);
+            MUtils.GetClass("RoomSystem").GetMethod("DeserializeLaunchProjectile", BindingFlags.Static | BindingFlags.NonPublic).Invoke(instance, new object[]
+            {
+                new object[]
+                {
+                    pos,
+                    vel,
+                    0,
+                    counter++,
+                    false,
+                    color.r,
+                    color.g,
+                    color.b,
+                    color.a,
+                }, default(PhotonMessageInfoWrapped)
+            });
+        }
         public static void SetColor(Color color)
         {
             typeof(GorillaColorizableBase).GetMethod("SetColor", NonPublicInstance).Invoke(typeof(GorillaColorizableBase), new object[] { color });
@@ -52,47 +116,6 @@ namespace MysticClient.Classes
                 MCTextures[i] = (Texture2D)BundleObjects[0].GetNamedChild(name).GetComponent<Renderer>().material.mainTexture;
             }
         }
-        public static void CorruptObject(GameObject obj) // it doesnt really corrupt anything i just thought it might me able to be used for a cool mod someday
-        {
-            obj.transform.position += new Vector3(
-                Random.Range(-5f, 5f),
-                Random.Range(-5f, 5f),
-                Random.Range(-5f, 5f)
-            );
-            obj.transform.rotation = Random.rotation;
-            obj.transform.localScale *= Random.Range(.5f, 2f);
-            var rend = obj.GetComponent<Renderer>();
-            if (rend != null)
-            {
-                var col = new Color(
-                    Random.value,
-                    Random.value,
-                    Random.value
-                );
-                rend.material = TransparentMaterial(GetChangeColorA(col, Random.Range(.1f, 1f)));
-                rend.material.mainTexture = MCTextures[Random.Range(0, 10)];
-            }
-            var rb = obj.GetComponent<Rigidbody>();
-            if (rb != null)
-            {
-                rb.AddForce(new Vector3(
-                    Random.Range(-10f, 10f),
-                    Random.Range(-10f, 10f),
-                    Random.Range(-10f, 10f)
-                ), ForceMode.Impulse);
-            }
-        }
-        public static void LagGun()
-        {
-            if (GunLib.CreateGun(out VRRig rig) && PhotonNetwork.InRoom)
-            {
-                for (int i = 0; i < 100; i++)
-                {
-                    RPCManager.LagEvent(RigUtils.GetViewFromRig(rig).Owner);
-                    RPCProtection();
-                }
-            }
-        }
         public static void BetaLaunchProjectie(int ProjHash, int TrailHash, Vector3 pos, Vector3 vel)
         {
             Traverse.Create(GameObject.Find("PhotonMono").GetComponent<PhotonHandler>()).Field("nextSendTickCountOnSerialize").SetValue((int)(Time.realtimeSinceStartup * 9999f)); // this is from iidks menu
@@ -101,34 +124,6 @@ namespace MysticClient.Classes
             typeof(ProjectileWeapon).GetField("projectilePrefab", NonPublicInstance).SetValue(RigUtils.MyOfflineRig.projectileWeapon, MUtils.instance.Instantiate(ProjHash, false));
             typeof(ProjectileWeapon).GetField("projectileTrail", NonPublicInstance).SetValue(RigUtils.MyOfflineRig.projectileWeapon, MUtils.instance.Instantiate(TrailHash, false));
             typeof(ProjectileWeapon).GetMethod("LaunchProjectile", NonPublicInstance).Invoke(RigUtils.MyOfflineRig.projectileWeapon, null);
-        }
-        public static void MuteAll()
-        {
-            foreach (var rigs in RigUtils.VRRigs)
-            {
-                LegacySendEvent(0, null, new RaiseEventOptions
-                {
-                    CachingOption = EventCaching.DoNotCache,
-                    Receivers = ReceiverGroup.Others,
-                }, true);
-                var v = RigUtils.GetNetViewFromRig(rigs).GetView;
-                v.ControllerActorNr = PhotonSystem.LocalPlayer.ActorNumber;
-                PhotonNetwork.Destroy(v); // und working no ban 100%
-            }
-        }
-        public static void MuteGun()
-        {
-            if (GunLib.CreateGun(out VRRig rig))
-            {
-                LegacySendEvent(0, null, new RaiseEventOptions 
-                {
-                    CachingOption = EventCaching.DoNotCache,
-                    TargetActors = new int[] { RigUtils.GetPlayerFromRig(rig).ActorNumber },
-                }, true);
-                var v = RigUtils.GetNetViewFromRig(rig).GetView; 
-                v.ControllerActorNr = PhotonSystem.LocalPlayer.ActorNumber;
-                PhotonNetwork.Destroy(v); // und working no ban 100%
-            }
         }
         public static void VStumpKickAll()
         {
@@ -159,7 +154,7 @@ namespace MysticClient.Classes
                 obj.name = "Right_PLATFORM";
             else if (hand == GorillaTagger.Instance.leftHandTransform)
                 obj.name = "Left_PLATFORM";
-            obj.transform.localScale = new Vector3(0.0125f, 0.28f, 0.3825f) * GorillaLocomotion.Player.Instance.scale;
+            obj.transform.localScale = new Vector3(0.0125f, 0.28f, 0.3825f) * GorillaLocomotion.GTPlayer.Instance.scale;
             obj.GetComponent<Renderer>().material.color = Color.blue; // color of platforms
             obj.transform.position = hand.position;
             obj.transform.rotation = hand.rotation;
@@ -221,7 +216,7 @@ namespace MysticClient.Classes
                             int seconds = (int)(DateTime.Parse(__instance.BanExpirationTime) - DateTime.UtcNow).TotalSeconds;
                             int minutes = (int)(DateTime.Parse(__instance.BanExpirationTime) - DateTime.UtcNow).TotalMinutes;
                             int hours = (int)(DateTime.Parse(__instance.BanExpirationTime) - DateTime.UtcNow).TotalHours;
-                            PlayFabAuthenticator.instance.gorillaComputer.GeneralFailureMessage(string.Concat(new string[]
+                            GorillaComputer.instance.GeneralFailureMessage(string.Concat(new string[]
                             {
                             "YOUR EXECUTION WILL HAPPIN IN\n ",
                             hours.ToString() + " | ",
@@ -233,7 +228,7 @@ namespace MysticClient.Classes
                         }
                         else
                         {
-                            PlayFabAuthenticator.instance.gorillaComputer.GeneralFailureMessage("YOUR ACCOUNT HAS BEEN BANNED INDEFINITELY.\nREASON: horrible");
+                            GorillaComputer.instance.GeneralFailureMessage("YOUR ACCOUNT HAS BEEN BANNED INDEFINITELY.\nREASON: horrible");
                         }
                     }
                 }
@@ -295,25 +290,12 @@ namespace MysticClient.Classes
                 var UI = (JoinTriggerUI)typeof(GorillaNetworkJoinTrigger).GetField("ui", BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(GNJT);
                 var bmt = (JoinTriggerUITemplate)typeof(JoinTriggerUI).GetField("template", BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(UI);
                 foreach (var field in bmt.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public))
-                {
-                    if (field.FieldType == typeof(Material))
+                    if (field.FieldType == typeof(Material) && field.Name.Contains("ScreenBG"))
                     {
-                        Material mat = field.GetValue(bmt) as Material;
+                        var mat = field.GetValue(bmt) as Material;
                         mat.color = boardColor;
                     }
-                }
             }
-        }
-        private static void Spam(int index = 32) // this wont work... but
-        {
-            if (PhotonSystem.InRoom)
-                SendRPC(RigUtils.MyPhotonView, "OnHandTapRPC", RpcTarget.All, new object[]
-                {
-                    index,
-                    false,
-                    1f,
-                    VRRig.PackWorldPosForNetwork(RigUtils.MyOnlineRig.rightHandTransform.position)
-                });
         }
         private static void TagEffect(Player target)
         {
@@ -349,8 +331,8 @@ namespace MysticClient.Classes
                 // the numbers that are set right now is a snow ball with a slingshot type trail
 
                 var col = Color.white; // color of projectile
-                Vector3 pos = GorillaLocomotion.Player.Instance.rightControllerTransform.position; // spawn position of projectile
-                Vector3 vel = GorillaLocomotion.Player.Instance.rightHandCenterVelocityTracker.GetAverageVelocity(true, 0f); // velocity of projectile
+                Vector3 pos = GorillaLocomotion.GTPlayer.Instance.rightControllerTransform.position; // spawn position of projectile
+                Vector3 vel = GorillaLocomotion.GTPlayer.Instance.rightHandCenterVelocityTracker.GetAverageVelocity(true, 0f); // velocity of projectile
                 LaunchProjectile(proj, trail, pos, vel, col); // launches proj remember these are client sided
 
                 // you can get rid of these // comments

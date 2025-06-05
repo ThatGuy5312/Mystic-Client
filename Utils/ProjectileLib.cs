@@ -6,6 +6,8 @@ using MysticClient.Menu;
 using System.Reflection;
 using Viveport;
 using MysticClient.Mods;
+using System.Runtime.CompilerServices;
+using Unity.XR.CoreUtils;
 
 namespace MysticClient.Utils
 {
@@ -58,72 +60,41 @@ namespace MysticClient.Utils
         }
         public class ServerSided
         {
-            public static ServerSided Internal { get; private set; }
-            private GorillaVelocityEstimator VelocityEstimator = null;
-            private float projDelay;
-            private float projDelayType;
-            public static void FireProjectile(ProjectileData projectileData, bool delay = false)
+            private static GorillaVelocityEstimator VelocityEstimator;
+            private static float projDelay;
+
+            public static void LaunchProjectile(ProjData data)
             {
-                Internal.LaunchProjectile(new object[]
-                {
-                    projectileData.projectile,
-                    projectileData.trail,
-                    projectileData.position,
-                    projectileData.velocity,
-                    projectileData.color,
-                    delay
-                });
-            }
-            public void LaunchProjectile(object[] args)
-            {
-                if (VelocityEstimator == null)
-                {
-                    var GVE = new GameObject("New GVE");
-                    VelocityEstimator = GVE.AddComponent<GorillaVelocityEstimator>();
-                }
-                VelocityEstimator.enabled = false;
-                var projectile = (SnowballThrowable)GetProjectile((int)args[0]);
-                //var component = projectile.AddComponent<SlingshotProjectile>();
-                if (!projectile.gameObject.activeSelf)
-                {
-                    projectile.EnableSnowballLocal(true);
-                    projectile.velocityEstimator = VelocityEstimator;
-                    projectile.transform.position = (Vector3)args[2];
-                }
-                if ((int)args[1] != -1)
-                {
-                    ObjectPools.instance.Instantiate((int)args[1]).GetComponent<SlingshotProjectileTrail>()
-                        .AttachTrail(projectile.gameObject, false, false);
-                }
+                VelocityEstimator ??= new GameObject("GVE").AddComponent<GorillaVelocityEstimator>();
+                SnowballMaker.leftHandInstance.TryCreateSnowball(data.makerId, out var projectile);
                 if (Time.time > projDelay)
                 {
-                    try
-                    {
-                        var position = (Vector3)args[2];
-                        var velocity = (Vector3)args[3];
-                        RigUtils.MyOfflineRig.SetThrowableProjectileColor(true, (Color)args[4]);
-                        RigUtils.MyOfflineRig.SetThrowableProjectileColor(false, (Color)args[4]);
-                        // set the stuff for this thing
-                        typeof(SnowballThrowable).GetMethod("LaunchSnowball", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(projectile, null);
-                    }
-                    catch { }
-                    if (projDelayType > 0f && !(bool)args[5])
-                    {
-                        projDelay = Time.time + projDelayType + 0.05f;
-                    }
+                    projectile.transform.position = data.position;
+                    projectile.randomizeColor = true;
+                    var velo = RigUtils.MyVelocity;
+                    RigUtils.MyOfflineRig.SetThrowableProjectileColor(true, data.color);
+                    projectile.velocityEstimator = VelocityEstimator;
+                    typeof(SnowballThrowable).GetMethod("PerformSnowballThrowAuthority", NonPublicInstance).Invoke(projectile, null);
+                    RigUtils.MyVelocity = velo;
+                    projDelay = Time.time + .14f;
                 }
+            }
+
+            public class ProjData
+            {
+                public Vector3 position;
+                public Vector3 velocity;
+                public string name;
+                public string id;
+                public int makerId;
+                public Color color;
             }
         }
         public class Other
         {
-            public static Other Internal { get; private set; }
-            private float projDelay;
-            private float projDelayType;
-            public static void BetaLaunchThrowable(object[] args)
-            {
-                Internal.LaunchProjectile(args);
-            }
-            public void LaunchProjectile(object[] args)
+            private static float projDelay;
+            private static float projDelayType;
+            public static void LaunchProjectile(object[] args)
             {
                 var ppt = (PaperPlaneThrowable)GetProjectile((int)args[0]);
                 if (Time.time > projDelay)
@@ -145,7 +116,7 @@ namespace MysticClient.Utils
         {
             public static void BetaLaunchElf(object[] args)
             {
-                var _events = (RubberDuckEvents)typeof(ElfLauncher).GetField("_events", NonPublicInstance).GetValue(typeof(RubberDuckEvents));
+                var _events = (RubberDuckEvents)typeof(ElfLauncher).GetField("_events", NonPublicInstance).GetValue(null);
                 _events.Activate.RaiseAll(new object[]
                 {
                     (Vector3)args[0], // position

@@ -21,7 +21,12 @@ using Viveport;
 using static SteamVR_Utils;
 using WebSocketSharp;
 using System.Diagnostics;
+using Debug = UnityEngine.Debug;
+using Random = UnityEngine.Random;
 using UnityEngine.UI;
+using GorillaExtensions;
+using System;
+using System.IO;
 
 namespace MysticClient.Mods
 {
@@ -30,15 +35,138 @@ namespace MysticClient.Mods
         // RigUtils.MyPlayer.transform.position + new Vector3(Mathf.Cos(Time.frameCount / 30f), 0f, Mathf.Sin(Time.frameCount / 30f)); orbit
         // Quaternion.Euler(new Vector3(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f))); spaz
 
+        private static float grabDelay = 0f;
+        private static float grabAmount = 1f;
+        public static void SpamGrab()
+        {
+            if (Controller.leftControllerIndexFloat.TriggerDown())
+            {
+                grabAmount = (grabAmount == 1) ? 0 : 1;
+                Controller.rightControllerIndexFloat = grabAmount;
+            }
+                /*if (Time.time > grabDelay)
+                {
+                    grabDelay = Time.time + .01f;
+                    grabAmount = (grabAmount == 1f) ? 0f : 1f;
+                    Controller.rightControllerIndexFloat = grabAmount;
+                }*/
+        }
 
+        public static GameObject car;
+        private static Vector2 joystickLerp = Vector2.zero;
+        public static Vector3 oldMousePos;
+        public static void CarMonke() // based of iiDks Drive mod at https://github.com/iiDk-the-actual/iis.Stupid.Menu/blob/master/Mods/Movement.cs
+        {
+            car.SetActive(true);
+            car.transform.parent = RigUtils.MyOnlineRig.transform;
+            car.transform.localPosition = RigUtils.MyOnlineRig.transform.position;
+            car.Destroy<Collider>();
+            if (UserInput.GetMouseButton(1))
+            {
+                var look = UserInput.mousePosition - oldMousePos;
+                Camera.main.transform.localEulerAngles += new Vector3(-look.y * .3f, look.x * .3f, 0);
+            }
+            oldMousePos = UserInput.mousePosition;
+            var con = Controller.leftControllerPrimary2DAxis;
+            joystickLerp = Vector2.Lerp(joystickLerp, con, .05f);
+            var dirocity = RigUtils.MyOnlineRig.bodyCollider.transform.forward * joystickLerp.y + RigUtils.MyOnlineRig.bodyCollider.transform.right * joystickLerp.x;
+            if ((Mathf.Abs(joystickLerp.x) > .05f) || Mathf.Abs(joystickLerp.y) > .05f || UserInput.GetKey(KeyCode.W))
+            {
+                RigUtils.MyOnlineRig.bodyCollider.attachedRigidbody.velocity = dirocity * 10f;
+                car.transform.localRotation = Quaternion.Euler(0, RigUtils.MyOnlineRig.transform.rotation.y, 180);
+            }
+        }
 
+        private static bool ranLegMod;
+        public static void LegMod(bool enable) // will get fixed when i feel like it
+        {
+            if (enable)
+            {
+                if (!ranLegMod)
+                {
+                    var armL = GameObject.Find("Player Objects/Local VRRig/Local Gorilla Player/rig/body/shoulder.L");
+                    var armR = GameObject.Find("Player Objects/Local VRRig/Local Gorilla Player/rig/body/shoulder.R");
+                    armL.transform.position -= new Vector3(0, .3f, 0);
+                    armR.transform.position -= new Vector3(0, .3f, 0);
+                    ranLegMod = true;
+                }
+            }
+            else
+            {
+                var armL = GameObject.Find("Player Objects/Local VRRig/Local Gorilla Player/rig/body/shoulder.L");
+                var armR = GameObject.Find("Player Objects/Local VRRig/Local Gorilla Player/rig/body/shoulder.R");
+                armL.transform.position += new Vector3(0, .3f, 0);
+                armR.transform.position += new Vector3(0, .3f, 0);
+                ranLegMod = false;
+            }
+        }
+
+        public static void RigGun() // this script ran away from the rig class
+        {
+            if (CreateGun(out RaycastHit hit))
+            {
+                RigUtils.MyOfflineRig.enabled = false;
+                RigUtils.MyOfflineRig.transform.position = hit.point + Vector3.up;
+            } else RigUtils.MyOfflineRig.enabled = true;
+        }
+
+        public static GameObject pickaxe = null;
         public static Texture2D mcBlockTexture = MCTextures[0];
         public static AudioClip mcSongClip = AudioClips[9];
+        public static List<GameObject> MinecraftCubes = new List<GameObject>();
         #region minecraft
+
+        [Serializable]
+        public class CubeData { public int TextureID; public Vector3 position; public Quaternion rotation; }
+        [Serializable]
+        public class CubeDataList { public List<CubeData> Cubes = new List<CubeData>(); }
+
+        public static void LoadMinecraftCubes()
+        {
+            if (!File.Exists("MysticClient/Saving/MinecraftSave.json"))
+            {
+                Debug.LogWarning("Could not find file MysticClient/Saving/MinecraftSave.json");
+                return;
+            }
+            var json = File.ReadAllText("MysticClient/Saving/MinecraftSave.json");
+            var objectList = JsonUtility.FromJson<CubeDataList>(json);
+            var loadedObjects = new List<GameObject>();
+            foreach (var datas in objectList.Cubes)
+            {
+                var obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                obj.transform.position = datas.position;
+                obj.transform.rotation = datas.rotation;
+                obj.ChangeTexture(MCTextures[datas.TextureID]);
+                if (datas.TextureID == 8) obj.ChangeShader(DefaultShader);
+                else if (datas.TextureID == 10) obj.ChangeMaterial(TransparentMaterial(GetChangeColorA(Color.white, .5f)));
+                else obj.ChangeShader(UniversalShader);
+                loadedObjects.Add(obj);
+            }
+            MinecraftCubes = loadedObjects;
+        }
+
+        public static void SaveMinecraftCubes()
+        {
+            var dataList = new CubeDataList();
+            foreach (var objs in MinecraftCubes)
+            {
+                var cubeData = new CubeData
+                {
+                    TextureID = objs.GetComponent<CubeManager>().textureID,
+                    position = objs.transform.position,
+                    rotation = objs.transform.rotation
+                };
+                dataList.Cubes.Add(cubeData);
+            }
+            if (dataList.Cubes.Count == 0) { Debug.LogWarning("No cubes found to save"); return; }
+            var json = JsonUtility.ToJson(dataList, true);
+            Directory.CreateDirectory("MysticClient/Saving");
+            File.WriteAllText("MysticClient/Saving/MinecraftSave.json", json);
+            Debug.Log($"Saved {dataList.Cubes.Count} cubes to MysticClient/Saving");
+        }
         public static void PlayMinecraftSong(bool toStop)
         {
-            if (toStop)
-                Loaders.MCObject.Stop();
+            if (toStop) Loaders.MCObject.Stop();
             else Loaders.PlayMCAudio(mcSongClip);
         }
 
@@ -49,17 +177,16 @@ namespace MysticClient.Mods
             {
                 var obj = hit.collider.gameObject;
                 if (Time.time > addColliderDelay && obj && gridParent != null)
-                {
                     try
                     {
                         if (obj.transform.IsChildOf(gridParent.transform))
                         {
                             obj.layer = 0;
+                            Networking.ChangeOtherCollider(obj.GetComponent<CubeManager>().cubeID, false);
                             addColliderDelay = Time.time + .2f;
                         }
                     }
                     catch { }
-                }
             }
         }
         private static float destroyColliderDelay = 0f;
@@ -69,17 +196,16 @@ namespace MysticClient.Mods
             {
                 var obj = hit.collider.gameObject;
                 if (Time.time > destroyColliderDelay && obj && gridParent != null)
-                {
                     try
                     {
                         if (obj.transform.IsChildOf(gridParent.transform))
                         {
                             obj.layer = 8;
+                            Networking.ChangeOtherCollider(obj.GetComponent<CubeManager>().cubeID, true);
                             destroyColliderDelay = Time.time + .2f;
                         }
                     }
                     catch { }
-                }
             }
         }
 
@@ -90,20 +216,19 @@ namespace MysticClient.Mods
             {
                 var obj = hit.collider.gameObject;
                 if (Time.time > destroyDelay && obj && gridParent != null)
-                {
                     try // i dont like seeing errors
                     {
                         if (obj.transform.IsChildOf(gridParent.transform))
                         {
-                            Destroy(obj);
+                            Networking.RemoveOtherCube(obj.GetComponent<CubeManager>().cubeID);
+                            obj.Destroy();
+                            MinecraftCubes.Remove(obj);
                             destroyDelay = Time.time + .2f;
                         }
                     }
                     catch { }
-                }
             }
         }
-        private static List<GameObject> MinecraftCubes = new List<GameObject>();
         private static GameObject gridParent;
         private static GameObject placePos = null;
         private static float blockPlaceCooldown;
@@ -112,53 +237,62 @@ namespace MysticClient.Mods
         {
             if (Controller.rightControllerPrimaryButton || UserInput.GetMouseButton(0))
                 foreach (var obj in MinecraftCubes)
-                    { Destroy(obj); GetIndex(btnname).enabled = false; }
-            else if (Controller.rightControllerSecondaryButton || UserInput.GetMouseButton(1))
+                { 
+                    Networking.RemoveOtherCube(obj.GetComponent<CubeManager>().cubeID);
+                    obj.Destroy();
+                    MinecraftCubes.Remove(obj);
+                    GetIndex(btnname).enabled = false;
+                }
+            else if (Controller.rightControllerSecondaryButton || UserInput.GetMouseButton(1)) 
                 GetIndex(btnname).enabled = false;
-            else
-                NotifiLib.SendNotification(NotifUtils.Menu() + "If You Want To Continue Press A To Comfirm Or Press B To Cancel", 5f);
+            else NotifiLib.SendNotification(NotifUtils.Menu() + "If You Want To Continue Press A To Comfirm Or Press B To Cancel", 5f);
         }
         public static void Minecraft()
         {
-            if (Controller.rightGrab || UserInput.GetMouseButton(1))
+            var on = GetEnabled("Left Hand") ? Controller.leftGrab : Controller.rightGrab;
+            var place = GetEnabled("Left Hand") ? Controller.leftControllerIndexFloat.TriggerDown() : Controller.rightControllerIndexFloat.TriggerDown();
+            var hand = GetEnabled("Left Hand") ? RigUtils.MyPlayer.leftControllerTransform : RigUtils.MyPlayer.rightControllerTransform;
+            if (on || UserInput.GetMouseButton(1))
             {
                 if (mcLineRenderer == null)
                 {
-                    var obj = new GameObject("MCLineRenderer");
-                    mcLineRenderer = obj.AddComponent<LineRenderer>();
-                    mcLineRenderer.material = TransparentMaterial(GetChangeColorA(Color.Lerp(MenuSettings.NormalColor, Color.gray, Mathf.PingPong(Time.time, 1f)), .2f));
+                    mcLineRenderer = new GameObject("MCLineRenderer").AddComponent<LineRenderer>();
+                    mcLineRenderer.material = TransparentMaterial(GetChangeColorA(Color.Lerp(MenuSettings.NormalColor, MenuSettings.outlineColor, Mathf.PingPong(Time.time, 1f)), .3f));
                     mcLineRenderer.startWidth = .05f;
                     mcLineRenderer.endWidth = .05f;
                 }
-                mcLineRenderer.material = TransparentMaterial(GetChangeColorA(Color.Lerp(MenuSettings.NormalColor, Color.gray, Mathf.PingPong(Time.time, 1f)), .2f));
-                mcLineRenderer.SetPosition(0, RigUtils.MyPlayer.rightControllerTransform.position);
-                mcLineRenderer.SetPosition(1, RigUtils.MyPlayer.rightControllerTransform.position + RigUtils.MyPlayer.rightControllerTransform.forward);
-                if (gridParent == null)
-                    gridParent = new GameObject("GridParent");
+                mcLineRenderer.material = TransparentMaterial(GetChangeColorA(Color.Lerp(MenuSettings.NormalColor, MenuSettings.outlineColor, Mathf.PingPong(Time.time, 1f)), .3f));
+                mcLineRenderer.SetPosition(0, hand.position);
+                mcLineRenderer.SetPosition(1, hand.position + hand.forward);
+                if (gridParent == null) gridParent = new GameObject("GridParent");
                 var pos = RoundToGrid(mcLineRenderer.GetPosition(1));
                 if (Time.time > blockPlaceCooldown)
                 {
-                    if (Controller.rightControllerIndexFloat.TriggerDown() || UserInput.GetMouseButton(0))
+                    if (place || UserInput.GetMouseButton(0))
                     {
                         var block = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                        block.AddComponent<BoxCollider>().isTrigger = true;
                         if (mcBlockTexture == MCTextures[8])
                             block.GetComponent<Renderer>().material.shader = DefaultShader;
                         else if (mcBlockTexture == MCTextures[10])
                             block.GetComponent<Renderer>().material = TransparentMaterial(GetChangeColorA(Color.white, .5f));
-                        else
-                            block.GetComponent<Renderer>().material.shader = UniversalShader;
+                        else block.GetComponent<Renderer>().material.shader = UniversalShader;
                         block.GetComponent<Renderer>().material.mainTexture = mcBlockTexture;
                         block.transform.position = pos;
                         block.transform.parent = gridParent.transform;
+                        var manager = block.AddComponent<CubeManager>();
+                        manager.cubeID = $"{PhotonSystem.GetMyNickName()}_MCCubeID=_{MinecraftCubes.Count + 1}";
+                        manager.textureID = Settings.Mode[26];
+                        Networking.SendCube(block.transform.position, block.transform.rotation, Settings.Mode[26], block.GetComponent<CubeManager>().cubeID);
                         MinecraftCubes.Add(block);
                         blockPlaceCooldown = Time.time + .1f;
                     }
                 }
-                if (!Controller.rightControllerIndexFloat.TriggerDown() || !UserInput.GetMouseButton(0))
+                if (!place || !UserInput.GetMouseButton(0))
                 {
                     if (placePos == null)
                         placePos = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    Destroy(placePos.GetComponent<Collider>());
+                    placePos.Destroy<Collider>();
                     placePos.GetComponent<Renderer>().material = TransparentMaterial(GetChangeColorA(Color.Lerp(Color.white, Color.gray, Mathf.PingPong(Time.time, 1f)), .2f));
                     placePos.GetComponent<Renderer>().material.mainTexture = mcBlockTexture;
                     placePos.transform.position = pos;
@@ -167,16 +301,35 @@ namespace MysticClient.Mods
             }
             else
             {
-                if (mcLineRenderer != null)
-                    Destroy(mcLineRenderer.gameObject);
-                if (placePos != null)
-                    Destroy(placePos);
+                mcLineRenderer?.gameObject.Destroy();
+                placePos?.Destroy();
                 mcLineRenderer = null;
                 placePos = null;
             }
         }
 
-        public class CubeManager : MonoBehaviour { public int cubeID; }
+        public static int pickaxeMaxHit = 4;
+        public class CubeManager : MonoBehaviour 
+        { 
+            public string cubeID;
+            public int textureID;
+            private static float destroyDelay = 0f;
+            private int hitAmount = 0;
+            private void OnTriggerEnter(Collider other)
+            {
+                if ((Time.time > destroyDelay || GetEnabled("No Hit Delay")) && other.name == "Pickaxe")
+                {
+                    destroyDelay = Time.time + .2f;
+                    hitAmount++;
+                    if (hitAmount == pickaxeMaxHit)
+                    {
+                        Loaders.PlayMCAudio(AudioClips[24]);
+                        gameObject.Destroy();
+                        Networking.RemoveOtherCube(cubeID);
+                    } else Loaders.PlayMCAudio(AudioClips[25]);
+                }
+            }
+        }
 
         #endregion
 
@@ -384,68 +537,47 @@ namespace MysticClient.Mods
             {
                 RigUtils.MyPlayer.bodyCollider.attachedRigidbody.velocity += RigUtils.MyPlayer.headCollider.transform.forward * Time.deltaTime * Movement.flySpeed;
                 var rigidbody = RigUtils.MyPlayer.bodyCollider.attachedRigidbody;
-                rigidbody.AddForce(new Vector3(0f, 25f, 0f), ForceMode.Impulse);
+                rigidbody.AddForce(new Vector3(0, 25f, 0), ForceMode.Impulse);
             }
             if (Controller.leftControllerIndexFloat.TriggerDown() || UserInput.GetMouseButton(0))
             {
                 RigUtils.MyPlayer.bodyCollider.attachedRigidbody.velocity -= RigUtils.MyPlayer.headCollider.transform.up * Time.deltaTime * Movement.flySpeed;
                 var rigidbody = RigUtils.MyPlayer.bodyCollider.attachedRigidbody;
-                rigidbody.AddForce(new Vector3(0f, -25f, 0f), ForceMode.Impulse);
+                rigidbody.AddForce(new Vector3(0, -25f, 0), ForceMode.Impulse);
             }
         }
         public static void GliderTracers()
         {
             foreach (var gliders in Gliders())
-            {
-                var line = new GameObject();
-                var lineRend = line.AddComponent<LineRenderer>();
-                lineRend.startColor = MenuSettings.FirstColor;
-                lineRend.endColor = MenuSettings.FirstColor;
-                lineRend.startWidth = 0.01f;
-                lineRend.endWidth = 0.01f;
-                lineRend.positionCount = 2;
-                lineRend.useWorldSpace = true;
-                lineRend.SetPosition(0, RigUtils.MyOnlineRig.rightHandTransform.position);
-                lineRend.SetPosition(1, gliders.transform.position);
-                lineRend.material.shader = Shader.Find("GUI/Text Shader");
-                Destroy(lineRend, Time.deltaTime);
-                Destroy(line, Time.deltaTime);
-            }
+                DrawLine(RigUtils.MyOnlineRig.rightHandTransform.position, gliders.transform.position, MenuSettings.NormalColor, .01f);
         }
         public static void FlingGliderGun()
         {
             if (CreateGun())
                 FlingGliders(pointer.transform.position, 2f, 2f);
         }
-        public static void FlingGliders(Vector3 direction, float bringForce, float flingForce) // made by @drew008278 a while back and cleaned up by me
+        public static void FlingGliders(Vector3 direction, float bringForce, float flingForce) // made by @itscludin. a while back and cleaned up by me
         {
             bool allAtTarget = true;
             foreach (var gliders in Gliders())
-            if (gliders.GetView.Owner == RigUtils.MyRealtimePlayer)
-            {
-                var gliderRB = gliders.GetComponent<Rigidbody>();
-                if (gliderRB != null)
+                if (gliders.GetView.Owner == RigUtils.MyRealtimePlayer)
                 {
-                    var directionToTarget = direction - gliderRB.position;
-                    gliderRB.AddForce(directionToTarget.normalized * bringForce, ForceMode.Impulse);
-                    if (directionToTarget.magnitude > 1f)
-                        allAtTarget = false;
+                    var gliderRB = gliders.GetComponent<Rigidbody>();
+                    if (gliderRB != null)
+                    {
+                        var directionToTarget = direction - gliderRB.position;
+                        gliderRB.AddForce(directionToTarget.normalized * bringForce, ForceMode.Impulse);
+                        if (directionToTarget.magnitude > 1f) allAtTarget = false;
+                    }
                 }
-            }
-            else
-                gliders.OnHover(null, null);
-            if (allAtTarget)
-            foreach (var gliders in Gliders())
-            if (gliders.GetView.Owner == RigUtils.MyRealtimePlayer)
-            {
-                var gliderRB = gliders.GetComponent<Rigidbody>();
-                if (gliderRB != null)
-                {
-                    gliderRB.AddForce(Vector3.up * flingForce, ForceMode.Impulse);
-                }
-            }
-            else
-                gliders.OnHover(null, null);
+                else gliders.OnHover(null, null);
+                    if (allAtTarget)
+                        foreach (var gliders in Gliders())
+                            if (gliders.GetView.Owner == RigUtils.MyRealtimePlayer)
+                            {
+                                var gliderRB = gliders.GetComponent<Rigidbody>();
+                                gliderRB?.AddForce(Vector3.up * flingForce, ForceMode.Impulse);
+                            } else gliders.OnHover(null, null);
         }
         private static TrailRenderer gliderTrail = null;
         public static void GliderTrails()
@@ -466,22 +598,22 @@ namespace MysticClient.Mods
                     gradient[4].time = .8f;
                     gradient[5].color = Color.yellow;
                     gradient[5].time = 1;
-                    var chager = gliderTrail.AddComponent<ColorChanger>();
-                    chager.colors = new Gradient { colorKeys = gradient };
-                    chager.loop = true;
                     gliderTrail = gliders.AddComponent<TrailRenderer>();
-                    gliderTrail.material = new Material(Shader.Find("Sprites/Default"));
+                    gliderTrail.material = new Material(DefaultShader);
                     gliderTrail.time = 1f;
                     gliderTrail.startWidth = 1;
                     gliderTrail.endWidth = 0;
                     gliderTrail.minVertexDistance = 6f;
+                    var chager = gliderTrail.AddComponent<ColorChanger>();
+                    chager.colors = new Gradient { colorKeys = gradient };
+                    chager.loop = true;
                 }
         }
         public static void GliderTrailsOff()
         {
             if (gliderTrail != null)
             {
-                Destroy(gliderTrail);
+                gliderTrail.Destroy();
                 gliderTrail = null;
             }
         }
@@ -494,8 +626,7 @@ namespace MysticClient.Mods
                         gliders.transform.position = pointer.transform.position;
                         gliders.transform.rotation = pointer.transform.rotation;
                     }
-                    else
-                        gliders.OnHover(null, null);
+                    else gliders.OnHover(null, null);
         }
         public static void RespawnGliders()
         {
@@ -505,8 +636,7 @@ namespace MysticClient.Mods
                     gliders.Respawn();
                     RecreateMenu();
                 }
-                else
-                    gliders.OnHover(null, null);
+                else gliders.OnHover(null, null);
         }
         public static void GetGliders()
         {
@@ -517,8 +647,7 @@ namespace MysticClient.Mods
                         gliders.transform.position = RigUtils.MyPlayer.rightControllerTransform.position;
                         gliders.transform.rotation = RigUtils.MyPlayer.rightControllerTransform.rotation;
                     }
-                    else
-                        gliders.OnHover(null, null);
+                    else gliders.OnHover(null, null);
         }
         private static GameObject bluePortal = null;
         private static GameObject orangePortal = null;
@@ -527,15 +656,9 @@ namespace MysticClient.Mods
             if (bluePortal != null && orangePortal != null)
             {
                 var rig = Vector3.Distance(bluePortal.transform.position, RigUtils.MyPlayer.transform.position);
-                if (rig < .35f)
-                {
-                    RigUtils.MyPlayer.transform.position = bluePortal.transform.position;
-                }
+                if (rig < .35f) RigUtils.MyPlayer.transform.position = bluePortal.transform.position;
                 var rig2 = Vector3.Distance(orangePortal.transform.position, RigUtils.MyPlayer.transform.position);
-                if (rig2 < .35f)
-                {
-                    RigUtils.MyPlayer.transform.position = orangePortal.transform.position;
-                }
+                if (rig2 < .35f) RigUtils.MyPlayer.transform.position = orangePortal.transform.position;
             }
         }
         public static void PortalGun()
@@ -550,7 +673,7 @@ namespace MysticClient.Mods
                         bluePortal.name = "BALLS";
                         bluePortal.transform.localScale = new Vector3(.3f, .3f, .3f);
                         bluePortal.GetComponent<Renderer>().material.color = Settings.colors[2];
-                        Destroy(bluePortal.GetComponent<Collider>());
+                        bluePortal.Destroy<Collider>();
                     }
                     bluePortal.transform.position = pointer.transform.position;
                 }
@@ -562,7 +685,7 @@ namespace MysticClient.Mods
                         orangePortal.name = "BALLS";
                         orangePortal.transform.localScale = new Vector3(.3f, .3f, .3f);
                         orangePortal.GetComponent<Renderer>().material.color = Settings.colors[4];
-                        Destroy(orangePortal.GetComponent<Collider>());
+                        orangePortal.Destroy<Collider>();
                     }
                     orangePortal.transform.position = pointer.transform.position;
                 }
@@ -618,7 +741,7 @@ namespace MysticClient.Mods
         {
             if (DougBug.GetComponent<ThrowableBug>().IsMyItem())
             {
-                var orbit = RigUtils.MyPlayer.transform.position + new Vector3(Mathf.Cos(Time.frameCount / 30f), 0f, Mathf.Sin(Time.frameCount / 30f));
+                var orbit = RigUtils.MyOnlineRig.transform.position + new Vector3(Mathf.Cos(Time.frameCount / 30f), 0f, Mathf.Sin(Time.frameCount / 30f));
                 DougBug.transform.position = orbit;
             }
             else
@@ -631,7 +754,7 @@ namespace MysticClient.Mods
         {
             if (BatteryAcid.GetComponent<ThrowableBug>().IsMyItem())
             {
-                var orbit = RigUtils.MyPlayer.transform.position + new Vector3(Mathf.Cos(Time.frameCount / 30f), 0f, Mathf.Sin(Time.frameCount / 30f));
+                var orbit = RigUtils.MyOnlineRig.transform.position + new Vector3(Mathf.Cos(Time.frameCount / 30f), 0f, Mathf.Sin(Time.frameCount / 30f));
                 BatteryAcid.transform.position = orbit;
             }
             else
@@ -701,17 +824,11 @@ namespace MysticClient.Mods
                 } else plat.GetComponent<Renderer>().material.color = Movement.PlatColor;
             }
         }
-        private static SnowballThrowable[] throwables = null;
         public static void RGBSnowballs(bool enable)
         {
             foreach (var throwable in GetThrowables())
                 if (throwable != null)
                     throwable.randomizeColor = enable;
-        }
-        private static SnowballThrowable[] GetThrowables()
-        {
-            throwables ??= Resources.FindObjectsOfTypeAll<SnowballThrowable>();
-            return throwables;
         }
         public static void GiveWaterBender(string btnname) // not working
         {
@@ -805,9 +922,9 @@ namespace MysticClient.Mods
                 var BallsRB = Balls.AddComponent(typeof(Rigidbody)) as Rigidbody;
                 BallsRB.velocity = Physics.gravity;
                 var trail = Balls.AddComponent<TrailRenderer>();
-                trail.material.shader = Shader.Find("Sprites/Default");
+                trail.material.shader = DefaultShader;
                 trail.time = 1f;
-                trail.startWidth = 0.1f;
+                trail.startWidth = .1f;
                 trail.endWidth = 0f;
                 trail.minVertexDistance = 1f;
                 trail.material.color = Balls.GetComponent<Renderer>().material.color;
@@ -846,8 +963,8 @@ namespace MysticClient.Mods
             else if (EnderBall != null)
             {
                 var ballRB = EnderBall.AddComponent(typeof(Rigidbody)) as Rigidbody;
-                    ballRB.velocity = RigUtils.MyPlayer.rightHandCenterVelocityTracker.GetAverageVelocity(true, 0f);
-                    EnderBall.AddComponent<EnderTrigger>();
+                ballRB.velocity = RigUtils.MyPlayer.rightHandCenterVelocityTracker.GetAverageVelocity(true, 0f);
+                EnderBall.AddComponent<EnderTrigger>();
             }
         }
         public class EnderTrigger : MonoBehaviour
@@ -857,7 +974,7 @@ namespace MysticClient.Mods
                 RigUtils.MyOnlineRig.transform.position = EnderBall.transform.position;
                 RigUtils.MyOnlineRig.GetComponent<Rigidbody>().velocity = Vector3.zero;
                 RigUtils.MyOfflineRig.PlayHandTapLocal(84, true, 999);
-                Destroy(EnderBall);
+                EnderBall.Destroy();
                 EnderBall = null;
             }
         }

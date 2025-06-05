@@ -13,56 +13,45 @@ namespace MysticClient.Classes
 {
     public class Saving : MonoBehaviour
     {
-        private static string[] SaveValues 
-        { 
-            get 
-            {
-                return new string[]
-                {
-                    $"MenuColor:{Mode[0]},0",
-                    $"ButtonOnColor:{Mode[3]},3",
-                    $"ButtonOffColor:{Mode[4]},4",
-                    $"PhysicsMode:{Mode[5]},5",
-                    $"GhostMode:{Mode[6]},6",
-                    $"GunShape:{Mode[7]},7",
-                    $"GunEnabledColor:{Mode[8]},8",
-                    $"GunDisabledColor:{Mode[9]},9",
-                    $"FlySpeed:{Mode[10]},10",
-                    $"SpeedBoostMode:{Mode[11]},11",
-                    $"GameDayTime:{Mode[12]},12",
-                    $"HandPointerPosMode:{Mode[13]},13",
-                    $"ButtonTextColor:{Mode[16]},16",
-                    $"MenuDestroyTime:{Mode[17]},17",
-                    $"PlatColor:{Mode[18]},18",
-                    $"PlatFirstColor:{Mode[19]},19",
-                    $"PlatSecondColor:{Mode[20]},20",
-                    $"ButtonSoundMode:{Mode[21]},21",
-                    $"GunLookType:{Mode[22]},22",
-                    $"MenuTheme:{Mode[23]},23",
-                    $"MenuOutlineColor:{Mode[24]},24",
-                    $"HandTrailColor:{Mode[25]},25",
-                    $"MinecraftSetBlock{Mode[26]},26",
-                    $"MinecraftSetSong:{Mode[27]},27",
-                    $"MenuFont:{Mode[28]},28",
-                    $"MenuTrailColor:{Mode[29]},29",
-                };
-            } 
-        }
-
-        private static string[] ProjectileValues
+        private static string[] SaveValues => new string[]
         {
-            get
-            {
-                return new string[]
-                {
-                    $"Projectile:{Proj.Mode[1]},1",
-                    $"Trail:{Proj.Mode[2]},2",
-                    $"ProjColor:{Proj.Mode[3]},3",
-                    $"ProjSpeed:{Proj.Mode[4]},4",
-                    $"ProjSize:{Proj.Mode[5]},5",
-                };
-            }
-        }
+            $"MenuColor:{Mode[0]},0",
+            $"ButtonOnColor:{Mode[3]},3",
+            $"ButtonOffColor:{Mode[4]},4",
+            $"PhysicsMode:{Mode[5]},5",
+            $"GhostMode:{Mode[6]},6",
+            $"GunShape:{Mode[7]},7",
+            $"GunEnabledColor:{Mode[8]},8",
+            $"GunDisabledColor:{Mode[9]},9",
+            $"FlySpeed:{Mode[10]},10",
+            $"SpeedBoostMode:{Mode[11]},11",
+            $"GameDayTime:{Mode[12]},12",
+            $"HandPointerPosMode:{Mode[13]},13",
+            $"ButtonTextColor:{Mode[16]},16",
+            $"MenuDestroyTime:{Mode[17]},17",
+            $"PlatColor:{Mode[18]},18",
+            $"PlatFirstColor:{Mode[19]},19",
+            $"PlatSecondColor:{Mode[20]},20",
+            $"ButtonSoundMode:{Mode[21]},21",
+            $"GunLookType:{Mode[22]},22",
+            $"MenuTheme:{Mode[23]},23",
+            $"MenuOutlineColor:{Mode[24]},24",
+            $"HandTrailColor:{Mode[25]},25",
+            $"MinecraftSetBlock{Mode[26]},26",
+            $"MinecraftSetSong:{Mode[27]},27",
+            $"MenuFont:{Mode[28]},28",
+            $"MenuTrailColor:{Mode[29]},29",
+            $"PickaxeStrike:{Mode[30]},30"
+        };
+
+        private static string[] ProjectileValues => new string[]
+        {
+            $"Projectile:{Proj.Mode[1]},1",
+            $"Trail:{Proj.Mode[2]},2",
+            $"ProjColor:{Proj.Mode[3]},3",
+            $"ProjSpeed:{Proj.Mode[4]},4",
+            $"ProjSize:{Proj.Mode[5]},5",
+        };
         private static void SaveChangeValue()
         {
             Directory.CreateDirectory("MysticClient\\Buttons");
@@ -154,7 +143,7 @@ namespace MysticClient.Classes
                     foreach (var buttons in buttonss)
                         foreach (var button in buttons)
                             if (button.buttonText == line)
-                                button.enabled = true;
+                                button.enabled = true; 
         }
 
         public static void Save()

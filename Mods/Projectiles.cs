@@ -4,6 +4,7 @@ using static MysticClient.Menu.Main;
 using Photon.Realtime;
 using OculusSampleFramework;
 using MysticClient.Classes;
+using GorillaTag.Cosmetics.Summer;
 
 namespace MysticClient.Mods
 {
@@ -101,31 +102,19 @@ namespace MysticClient.Mods
                 if (Mode[0] == 0)
                 {
                     if (Controller.rightGrab || UserInput.GetMouseButton(0))
-                    {
-                        ServerSided.FireProjectile(RightHand);
                         LegacySendEvent(111, RightHand, new RaiseEventOptions { Receivers = ReceiverGroup.Others }, true);
-                    }
                 }
                 else if (Mode[0] == 1)
                 {
                     if (Controller.leftGrab || UserInput.GetMouseButton(1))
-                    {
-                        ServerSided.FireProjectile(LeftHand);
                         LegacySendEvent(111, LeftHand, new RaiseEventOptions { Receivers = ReceiverGroup.Others }, true);
-                    }
                 }
                 else if (Mode[0] == 2)
                 {
                     if (Controller.rightGrab || UserInput.GetMouseButton(0))
-                    {
-                        ServerSided.FireProjectile(RightHand);
                         LegacySendEvent(111, RightHand, new RaiseEventOptions { Receivers = ReceiverGroup.Others }, true);
-                    }
                     if (Controller.leftGrab || UserInput.GetMouseButton(1))
-                    {
-                        ServerSided.FireProjectile(LeftHand);
                         LegacySendEvent(111, LeftHand, new RaiseEventOptions { Receivers = ReceiverGroup.Others }, true);
-                    }
                 }
             }
             else
@@ -168,7 +157,6 @@ namespace MysticClient.Mods
                 if (Controller.rightControllerIndexFloat > 0.5f || UserInput.GetMouseButton(0))
                 {
                     var data = new ProjectileData(-675036877, trail, RigUtils.MyOfflineRig.transform.position - new Vector3(0f, 0.3f, 0f), RigUtils.MyOfflineRig.transform.forward.normalized * 5f, Color.white, projSize);
-                    ServerSided.FireProjectile(data, true);
                     LegacySendEvent(111, data, new RaiseEventOptions { Receivers = ReceiverGroup.Others }, true);
                 }
             }
@@ -189,7 +177,6 @@ namespace MysticClient.Mods
                 if (Controller.rightControllerIndexFloat > 0.5f || UserInput.GetMouseButton(0))
                 {
                     var data = new ProjectileData(-675036877, trail, RigUtils.MyOfflineRig.transform.position - new Vector3(0f, 0.3f, 0f), RigUtils.MyOfflineRig.transform.forward.normalized * 5f, Color.yellow, projSize);
-                    ServerSided.FireProjectile(data, true);
                     LegacySendEvent(111, data, new RaiseEventOptions { Receivers = ReceiverGroup.Others }, true);
                 }
             }
@@ -211,7 +198,6 @@ namespace MysticClient.Mods
                 if (Controller.rightControllerIndexFloat > 0.5f || UserInput.GetMouseButton(0))
                 {
                     //var data = new ProjectileData(-675036877, trail, RigUtils.MyOnlineRig.bodyCollider.transform.position, Vector3.zero, new Color(99f/255f, 45f/255f, 0f));
-                    ServerSided.FireProjectile(data, true);
                     LegacySendEvent(111, data, new RaiseEventOptions { Receivers = ReceiverGroup.Others }, true);
                 }
             }
@@ -229,11 +215,8 @@ namespace MysticClient.Mods
         {
             if (CreateGun())
             {
-                var data = new ProjectileData(projectile, trail, pointer.transform.position, Vector3.zero, rainbowColor ? RGBColor() : funnyRGB ? HardColor(Random.Range(0, 10)) : projectileColor, projSize);
-                if (GetEnabled("ServerSided Projectiles"))
-                    ServerSided.FireProjectile(data);
-                else
-                    LaunchProjectile(data);
+                var data = new ProjectileData(projectile, trail, pointer.transform.position, Vector3.zero, rainbowColor ? RGBColor() : funnyRGB ? HardColor(MUtils.GetRandomColorID) : projectileColor, projSize);
+                LaunchProjectile(data);
                 LegacySendEvent(111, data, new RaiseEventOptions { Receivers = ReceiverGroup.Others }, true);
             }
         }
@@ -247,10 +230,7 @@ namespace MysticClient.Mods
                 var pos = RigUtils.MyOnlineRig.rigidbody.useGravity ? RigUtils.MyPlayer.transform.position : RigUtils.MyOfflineRig.transform.position + new Vector3(
                     Mathf.Cos(angle * Mathf.Deg2Rad) * rad, .7f, Mathf.Sin(angle * Mathf.Deg2Rad) * rad);
                 var data = new ProjectileData(projectile, trail, pos, Vector3.zero, rainbowColor ? RGBColor() : funnyRGB ? HardColor(i) : projectileColor, projSize);
-                if (GetEnabled("ServerSided Projectiles"))
-                    ServerSided.FireProjectile(data);
-                else
-                    LaunchProjectile(data);
+                LaunchProjectile(data);
                 LegacySendEvent(111, data, new RaiseEventOptions { Receivers = ReceiverGroup.Others }, true);
             }
             // anti lag stuff
@@ -260,23 +240,19 @@ namespace MysticClient.Mods
             Destroy(obj.GetComponent<Renderer>());
             Destroy(obj, Time.deltaTime);
         }
-        public static ProjectileData RightHand { get {
-            return new ProjectileData(
-                projectile,
-                trail,
-                RigUtils.MyPlayer.rightControllerTransform.position,
-                Vector3.up + RigUtils.MyPlayer.rightControllerTransform.forward * projectileSpeed + RigUtils.MyPlayer.rightHandCenterVelocityTracker.GetAverageVelocity(true, 0f, false),
-                rainbowColor ? RGBColor() : funnyRGB ? HardColor(Random.Range(0, 10)) : projectileColor, projSize);
-            }
-        }
-        public static ProjectileData LeftHand { get {
-            return new ProjectileData(
-                projectile,
-                trail,
-                RigUtils.MyPlayer.leftControllerTransform.position,
-                Vector3.up + RigUtils.MyPlayer.leftControllerTransform.forward * projectileSpeed + RigUtils.MyPlayer.leftHandCenterVelocityTracker.GetAverageVelocity(true, 0f, false),
-                rainbowColor ? RGBColor() : funnyRGB ? HardColor(Random.Range(0, 10)) : projectileColor, projSize);
-            }
-        }
+
+        public static ProjectileData RightHand => new ProjectileData(
+        projectile,
+        trail,
+        RigUtils.MyPlayer.rightControllerTransform.position,
+        Vector3.up + RigUtils.MyPlayer.rightControllerTransform.forward*projectileSpeed + RigUtils.MyPlayer.rightHandCenterVelocityTracker.GetAverageVelocity(true, 0),
+        rainbowColor ? RGBColor() : funnyRGB ? HardColor(MUtils.GetRandomColorID) : projectileColor, projSize);
+
+        public static ProjectileData LeftHand => new ProjectileData(
+        projectile,
+        trail,
+        RigUtils.MyPlayer.leftControllerTransform.position,
+        Vector3.up + RigUtils.MyPlayer.leftControllerTransform.forward*projectileSpeed + RigUtils.MyPlayer.leftHandCenterVelocityTracker.GetAverageVelocity(true, 0),
+        rainbowColor? RGBColor() : funnyRGB? HardColor(MUtils.GetRandomColorID) : projectileColor, projSize);
     }
 }

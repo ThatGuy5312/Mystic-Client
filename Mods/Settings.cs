@@ -27,6 +27,7 @@ using Unity.XR.CoreUtils;
 using GorillaNetworking;
 using System.Xml;
 using Steamworks;
+using GorillaExtensions;
 
 namespace MysticClient.Mods
 {
@@ -34,15 +35,16 @@ namespace MysticClient.Mods
     {
         public static int[] Mode = new int[9999];
         private static PrimitiveType[] shapes = { PrimitiveType.Cube, PrimitiveType.Sphere, PrimitiveType.Capsule, PrimitiveType.Cylinder, PrimitiveType.Plane, PrimitiveType.Quad }; // iidk told me to do (PrimitiveType)Mode[ii] but it breaks so im not
-        public static Color[] colors = { Color.black, new Color(.541f, .027f, .761f, 1), Color.blue, Color.yellow, new Color(1, .51f, 0, 1), Color.white, Color.cyan, Color.green, Color.red, new Color32(135, 0, 0, 1), Color.magenta, Color.gray };
+        public static Color[] colors = new Color[] { Color.black, new Color(.541f, .027f, .761f, 1), Color.blue, Color.yellow, new Color(1, .51f, 0, 1), Color.white, Color.cyan, Color.green, Color.red, new Color32(135, 0, 0, 1), Color.magenta, Color.gray };
         public static Color[] unityc = { Color.black, Color.blue, Color.yellow, Color.white, Color.cyan, Color.green, Color.red, Color.magenta, Color.gray };
         private static int[] flySpeeds = { 15, 10, 25 };
         private static int[] speedBoostSpeeds = { 12, 9, 16, 25, int.MaxValue };
         private static int[] times = { 3, 6, 0, 1 };
         private static int[] destroyDelays = { 0, 2, 5, 10, int.MaxValue };
         private static int[] buttonSounds = { 67, 66, 176, 8, 18, 244, 221, 84 };
-        private static Vector3[] pointerPoses = { new Vector3(0, -.1f, -.15f), new Vector3(0, .1f, 0), new Vector3(0, -.1f, 0) };
-        private static int[] mcsoundid = { 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23 };
+        private static Vector3[] pointerPoses = { new Vector3(0, -.1f, 0), new Vector3(0, .1f, 0), new Vector3(0, .0666f, .1f) };
+        private static int[] mcsoundid = { 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 26 };
+        private static int[] pickaxeStrikes = { 4, 3, 2, 1 };
         public static string[][] Names =
         {
             new string[] { "Black", "Purple", "Blue", "Yellow", "Orange", "White", "Cyan", "Green", "Red", "Blood", "Magenta", "Gray" }, // 0
@@ -52,17 +54,27 @@ namespace MysticClient.Mods
             new string[] { "Normal", "Small", "Big", "Huge", "???" }, // 4
             new string[] { "Day", "Dawn", "Night", "Sun Rise", "Untouched" }, // 5
             new string[] { "Bottom", "Sides", "Top" }, // 6
-            new string[] { "Quest", "Steam", "Steam / Quest" }, // 7
+            new string[] { "Normal", "Under", "Over" }, // 7
             new string[] { "Mystic", "ThatGuy", "AZ", "KFJ" }, // 8 (not used)
             new string[] { "Black", "Blue", "Yellow", "White", "Cyan", "Green", "Red", "Magenta", "Gray" }, // 9
             new string[] { "Instant", "2s", "5s", "10s", "Never" }, // 10
             new string[] { "Click", "Key", "Cloud", "Wood", "Metal", "Ding", "Glass", "Bubble" }, // 11
             new string[] { "Sharp", "Boring", "Bendy", "Spiral" }, // 12
             new string[] { "Grass", "Dirt", "Wood", "Leaf", "Oak Plank", "Stone", "Cobblestone", "Hay Bale", "Glass", "Obsidian", "Water", "Trap Door" }, // 13
-            new string[] { "Living Mice", "Clark", "Danny", "Oxygene", "Key", "Droopy Likes your Face", "Moog City", "Moog City 2", "Subwoofer Lullaby", "Dog", "Cat", "Aria Math", "Haggstorm", "Pigstep", "Pigstep (Alan Becker)" }, // 14
+            new string[] { "Living Mice", "Clark", "Danny", "Oxygene", "Key", "Droopy Likes your Face", "Moog City", "Moog City 2", "Subwoofer Lullaby", "Dog", "Cat", "Aria Math", "Haggstorm", "Pigstep", "Pigstep (Alan Becker)", "Moon 2" }, // 14
             new string[] { "Arial", "Consolas", "Constantia", "Corbel", "Cascadia Mono", "Courier New", "Segoe Print", "Segoe Script", "Gabriola", "Ink Free", "Lucida Console", "Comic Sans MS", "Palatino Linotype", "Impact", "Candara", "Verdana" }, // 15
+            new string[] { "4", "3", "2", "1" }, // 16
         };
 
+        public static void ChangeMinecraftPickaxeMaxStrike(string tooltip)
+        {
+            Mode[30]++;
+            if (Mode[30] >= Names[16].Length) { Mode[30] = 0; }
+            Fun.pickaxeMaxHit = pickaxeStrikes[Mode[30]];
+            string[] text = GetToolTip(tooltip).buttonText.Split(':');
+            GetToolTip(tooltip).buttonText = text[0] + ": " + Names[16][Mode[30]];
+            GetToolTip(tooltip).enabled = false;
+        }
         public static void ChangeMenuTrailColor(string tooltip)
         {
             Mode[29]++;
@@ -357,9 +369,11 @@ namespace MysticClient.Mods
             outlineColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[24]]) : colors[Mode[24]];
             handTrailColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[25]]) : colors[Mode[25]];
             Fun.mcBlockTexture = MCTextures[Mode[26]];
-            Fun.mcSongClip = AudioClips[mcsoundid[Mode[27]]];
+            if (!fastLoad)
+                Fun.mcSongClip = AudioClips[mcsoundid[Mode[27]]];
             currentFont = Font.CreateDynamicFontFromOSFont(Names[15][Mode[28]], 1);
             menuTrailColor = GetEnabled("Use System Colors") ? SCToUC(scolor[Mode[29]]) : colors[Mode[29]];
+            Fun.pickaxeMaxHit = pickaxeStrikes[Mode[30]];
         }
 
         public static void SetWind(bool enabled)
@@ -370,8 +384,7 @@ namespace MysticClient.Mods
         private static ForceVolume[] forceVolumes = null;
         public static ForceVolume[] GetForceVolumes()
         {
-            if (forceVolumes == null)
-                forceVolumes = Resources.FindObjectsOfTypeAll<ForceVolume>();
+            forceVolumes ??= Resources.FindObjectsOfTypeAll<ForceVolume>();
             return forceVolumes;
         }
         private static GameObject FPCamera;
@@ -401,11 +414,11 @@ namespace MysticClient.Mods
             }
         }
 
-        public static void EnterPage(int page, int index = 0)
+        public static void EnterPage(int page, int easyPage = 0, int pageNumber = 0)
         {
             buttonsType = page;
-            pageNumber = 0;
-            easyPage = index;
+            Main.pageNumber = pageNumber;
+            Main.easyPage = easyPage;
         }
 
         // originaly made by kingofnetflix https://github.com/kingofnetflix/BAnANA/blob/master/BAnANA/BAnANA/Main/VoiceManager.cs
@@ -414,7 +427,7 @@ namespace MysticClient.Mods
 
         private static Dictionary<string, Action> commands;
 
-        private static string[] phrase = { "mystic", "client", "jarvis", "google", "siri", "alaxa", "computer", "console", "bitch", "azmyth", "thatguy", "that guy", "chat GPT", "goober", "rat", "skid", "good sir", "good ser" };
+        private static string[] phrase = { "mystic", "client", "jarvis", "google", "siri", "alaxa", "computer", "console", "bitch", "azmyth", "thatguy", "that guy", "chat GPT", "goober", "rat", "skid", "skidder" };
         private static string[] discardPhrase = { "cancel", "stop", "nevermind", "never mind", "shut the fuck up" };
 
         private static bool listening = false;
@@ -429,8 +442,9 @@ namespace MysticClient.Mods
                             commands[btn.buttonText.Split('[')[0].ToLower()] = () => Toggle(btn.buttonText);
                         else if (btn.buttonText.Contains(":"))
                             commands["change " + btn.buttonText.Split(':')[0].ToLower()] = () => Toggle(btn.buttonText);
-                        else
-                            commands[btn.buttonText.ToLower()] = () => Toggle(btn.buttonText);
+                        else commands[btn.buttonText.ToLower()] = () => Toggle(btn.buttonText);
+            foreach (var discard in discardPhrase)
+                commands.Add(discard, () => CancelVoiceCommand());
         }
 
         public static void EnableVoiceCommands()
@@ -452,7 +466,7 @@ namespace MysticClient.Mods
                     Loaders.PlayAudio(AudioClips[3]);
                 StartCommandRecognition();
                 listeningCoroutine = MUtils._RunCoroutine(Timeout());
-                SendNotification(Voice() + "listening..", false);
+                SendNotification(Voice() + "listening..", MessageInfo.None, false);
             }
         }
         private static void StartCommandRecognition()
@@ -469,14 +483,8 @@ namespace MysticClient.Mods
                 commands[args.text]?.Invoke();
                 if (listeningCoroutine != null)
                     MUtils._EndCoroutine(listeningCoroutine);
-                SendNotification(Voice() + $"Toggled {args.text}", false);
+                SendNotification(Voice() + $"Toggled {args.text}", MessageInfo.None, false);
                 Loaders.PlayAudio(AudioClips[4]);
-                listening = false;
-            }
-            else if (listening && discardPhrase.Contains(args.text))
-            {
-                CancelVoiceCommand();
-                SendNotification(Voice() + "Canceling..");
                 listening = false;
             }
         }
@@ -484,10 +492,8 @@ namespace MysticClient.Mods
         public static void StopVoiceCommands()
         {
             listening = false;
-            if (enablePhrase != null)
-                enablePhrase.Stop();
-            if (modPhrase != null)
-                modPhrase.Stop();
+            enablePhrase?.Stop();
+            modPhrase?.Stop();
             enablePhrase = null;
             modPhrase = null;
         }
@@ -508,6 +514,7 @@ namespace MysticClient.Mods
 
         private static void CancelVoiceCommand()
         {
+            SendNotification(Voice() + "Canceling..");
             listening = false;
             modPhrase.Stop();
             modPhrase.Dispose();
@@ -529,8 +536,12 @@ namespace MysticClient.Mods
             "II Template",
             "KMan",
             "Mango",
-            "Sial Temp?",
+            "Sial Template?",
             //"PayPal",
+            "Skelo Template (not really)",
+            "NXO Template",
+            "Soup",
+            "Wide / Small",
             "Wide",
             "Really Wide",
             "Long"
@@ -563,6 +574,8 @@ namespace MysticClient.Mods
                 buttonPos = new Vector3(.56f, 0, .29f);
                 buttonOffset = 1f;
                 internalButtonOffset = .13f;
+                settingButtonOffset = .35f;
+                search = new Vector2(-.45f, -.77f);
                 //buttonTextPos = new Vector3(.064f, 0f, .111f);
                 //buttonTextOffset = 2.6f; // 3.05
                 buttonFontStyle = FontStyle.Normal;
@@ -600,6 +613,7 @@ namespace MysticClient.Mods
                 menuSize = new Vector3(.1f, 1, 1);
                 buttonSize = new Vector3(.09f, .8f, .08f);
                 buttonPos = new Vector3(.56f, 0, .19f);
+                search = new Vector2(-.45f, -.675f);
                 buttonOffset = 1;
                 //buttonTextPos = new Vector3(.064f, 0, .076f);
                 //buttonTextOffset = 2.55f;
@@ -635,6 +649,8 @@ namespace MysticClient.Mods
                 buttonSize = new Vector3(.09f, .9f, .08f);
                 buttonPos = new Vector3(.56f, 0, .28f);
                 buttonOffset = 1.15f;
+                settingButtonOffset = .4f;
+                search = new Vector2(-.45f, -.925f);
                 //buttonTextPos = new Vector3(.064f, 0f, .111f);
                 //buttonTextOffset = 2.9f;
                 buttonFontStyle = FontStyle.Italic;
@@ -653,6 +669,7 @@ namespace MysticClient.Mods
                 menuPos = new Vector3(.05f, 0, 0);
                 buttonSize = new Vector3(.09f, .9f, .08f);
                 buttonPos = new Vector3(.56f, 0, .28f);
+                search = new Vector2(-.45f, -.555f);
                 buttonOffset = 1;
                 //buttonTextPos = new Vector3(.064f, 0, .111f);
                 //buttonTextOffset = 2.6f;
@@ -677,7 +694,9 @@ namespace MysticClient.Mods
                 menuPos = new Vector3(.05f, 0, -.03f);
                 buttonSize = new Vector3(.09f, .8f, .08f);
                 buttonPos = new Vector3(.56f, 0, .29f);
+                search = new Vector2(-.42f, -.73f);
                 buttonOffset = 1f;
+                settingButtonOffset = .35f;
                 //buttonTextPos = new Vector3(.064f, 0, .111f);
                 //buttonTextOffset = 2.6f;
                 buttonFontStyle = FontStyle.Italic;
@@ -700,6 +719,7 @@ namespace MysticClient.Mods
                 menuPos = new Vector3(.05f, 0, 0);
                 buttonSize = new Vector3(.09f, .8f, .08f);
                 buttonPos = new Vector3(.56f, 0, .02f);
+                search = new Vector2(-.45f, -.555f);
                 buttonOffset = 1f;
                 //buttonTextPos = new Vector3(.064f, 0, .111f);
                 //buttonTextOffset = 2.6f;
@@ -723,7 +743,9 @@ namespace MysticClient.Mods
                 menuPos = new Vector3(.05f, 0, -.004f);
                 buttonSize = new Vector3(.09f, .92f, .08f);
                 buttonPos = new Vector3(.56f, 0, .28f);
+                search = new Vector2(-.45f, -.615f);
                 buttonOffset = 1f;
+                settingButtonOffset = .41f;
                 //buttonTextPos = new Vector3(.064f, 0f, .112f);
                 //buttonTextOffset = 2.55f; // 3.05
                 buttonFontStyle = FontStyle.Normal;
@@ -758,7 +780,120 @@ namespace MysticClient.Mods
                 disconnectSize = new Vector3(.09f, .5f, .1f);
                 disconnectPos = new Vector3(.5f, 0, -.53f);
             }*/
-            else if (Mode[23] == 9) // wide
+            else if (Mode[23] == 9) // skelo temp
+            {
+                parentSize = new Vector3(.1f, .3f, .3825f);
+                pageButtonSize = new Vector3(.09f, .9f, .08f);
+                pagePoss[0] = new Vector3(.56f, 0, .28f);
+                pagePoss[1] = new Vector3(.56f, 0, .18f);
+                menuSize = new Vector3(.1f, 1.023f, .92f);
+                menuPos = new Vector3(.05f, 0, 0);
+                buttonSize = new Vector3(.09f, .9f, .08f);
+                buttonPos = new Vector3(.56f, 0, .29f);
+                search = new Vector2(-.45f, -.515f);
+                buttonOffset = 1f;
+                settingButtonOffset = .41f;
+                internalButtonOffset = .1f;
+                internalButtonAddOffset = .2f;
+                buttonFontStyle = FontStyle.Normal;
+                titleFontStyle = FontStyle.Normal;
+                pageSize = 6;
+                toolTipZ = -.18f;
+                menuTitleZ = .171f;
+                nextPageText = "------->";
+                lastPageText = "<-------";
+                disconnectSize = new Vector3(.045f, .66f, .17f);
+                disconnectPos = new Vector3(.50f, -1.122f, .1f);
+            }
+            else if (Mode[23] == 10) // nxo template
+            {
+                parentSize = new Vector3(.1f, .2f, .3f);
+                pageButtonSize = new Vector3(.005f, .25f, .08f);
+                pagePoss[0] = new Vector3(.505f, .285f, -.31f);
+                pagePoss[1] = new Vector3(.505f, -.285f, - .31f);
+                menuSize = new Vector3(.01f, .925f, .90f);
+                menuPos = new Vector3(.05f, 0, .025f);
+                buttonSize = new Vector3(.005f, .82f, .08f);
+                buttonPos = new Vector3(.505f, 0, .3250f);
+                search = new Vector2(-.4f, -.415f);
+                buttonOffset = 1f;
+                settingButtonOffset = .36f;
+                internalButtonOffset = .09f;
+                internalButtonAddOffset = 0;
+                buttonFontStyle = FontStyle.Normal;
+                titleFontStyle = FontStyle.Normal;
+                pageSize = 7;
+                toolTipZ = -.18f;
+                menuTitleZ = .135f;
+                nextPageText = ">";
+                lastPageText = "<";
+                disconnectSize = new Vector3(.005f, .8975f, .0575f);
+                disconnectPos = new Vector3(.5f, 0, .6f);
+                returnButton = true;
+                menuTextSize = new Vector2(.16f, .01725f);
+                menuTitleSize = new Vector2(.19f, .04f);
+                sideTextSize = new Vector2(.2f, .02f);
+            }
+            else if (Mode[23] == 11) // soup menu
+            {
+                parentSize = new Vector3(.1f, .3f, .3825f);
+                pageButtonSize = new Vector3(.06f, .9f, .09f);
+                pagePoss[0] = new Vector3(.56f, 0, -.39f);
+                pagePoss[1] = new Vector3(.56f, 0, -.29f);
+                menuSize = new Vector3(.1f, 1, .97f);
+                menuPos = new Vector3(.05f, 0, 0);
+                buttonSize = new Vector3(.06f, .9f, .09f);
+                buttonPos = new Vector3(.56f, 0, .27f);
+                search = new Vector2(-.45f, -.54f);
+                buttonOffset = 1f;
+                settingButtonOffset = .36f;
+                internalButtonOffset = .11f;
+                internalButtonAddOffset = 0;
+                buttonFontStyle = FontStyle.Italic;
+                titleFontStyle = FontStyle.Italic;
+                pageSize = 5;
+                toolTipZ = -.18f;
+                menuTitleZ = .155f;
+                nextPageText = ">>>>>";
+                lastPageText = "<<<<<";
+                disconnectSize = new Vector3(.09f, .9f, .08f);
+                disconnectPos = new Vector3(.56f, 0, .56f);
+                returnButton = false;
+                menuTextSize = new Vector2(.2f, .03f);
+                menuTitleSize = new Vector2(.28f, .05f);
+                sideTextSize = new Vector2(.2f, .03f);
+            }
+            else if (Mode[23] == 12) // wide / skinny
+            {
+                parentSize = new Vector3(.1f, .2f, .4f);
+                pageButtonSize = new Vector3(0.045f, 0.25f, 0.064295f);
+                pagePoss[0] = new Vector3(0.56f, 0.65f, 0.45f);
+                pagePoss[1] = new Vector3(0.56f, -0.65f, 0.45f);
+                menuSize = new Vector3(.1f, 1.6f, 1f);
+                menuPos = new Vector3(0.05f, 0f, -0.05f);
+                buttonSize = new Vector3(.09f, 1.4f, .08f);
+                buttonPos = new Vector3(.56f, 0, .23f);
+                search = new Vector2(-.75f, -.68f);
+                buttonOffset = 1.2f;
+                settingButtonOffset = .65f;
+                internalButtonOffset = .13f;
+                internalButtonAddOffset = 0;
+                //buttonTextPos = new Vector3(.064f, 0f, .089f);
+                //buttonTextOffset = 3f;
+                buttonFontStyle = FontStyle.Italic;
+                titleFontStyle = FontStyle.BoldAndItalic;
+                pageSize = 8;
+                toolTipZ = -.24f;
+                menuTitleZ = .133f;
+                nextPageText = "";
+                lastPageText = "";
+                disconnectSize = new Vector3(.09f, .9f, .08f);
+                disconnectPos = new Vector3(.56f, 0, .45f);
+                menuTextSize = new Vector2(.2f, .03f);
+                menuTitleSize = new Vector2(.28f, .05f);
+                sideTextSize = new Vector2(.1f, .03f);
+            }
+            else if (Mode[23] == 13) // wide
             {
                 parentSize = new Vector3(.1f, .3f, .4f);
                 pageButtonSize = new Vector3(0.045f, 0.25f, 0.064295f);
@@ -769,6 +904,9 @@ namespace MysticClient.Mods
                 buttonSize = new Vector3(.09f, 1.4f, .08f);
                 buttonPos = new Vector3(.56f, 0, .23f);
                 buttonOffset = 1.2f;
+                settingButtonOffset = .65f;
+                internalButtonOffset = .13f;
+                internalButtonAddOffset = 0;
                 //buttonTextPos = new Vector3(.064f, 0f, .089f);
                 //buttonTextOffset = 3f;
                 buttonFontStyle = FontStyle.Italic;
@@ -781,7 +919,7 @@ namespace MysticClient.Mods
                 disconnectSize = new Vector3(.09f, .9f, .08f);
                 disconnectPos = new Vector3(.56f, 0, .45f);
             }
-            else if (Mode[23] == 10) // really wide
+            else if (Mode[23] == 14) // really wide
             {
                 pageButtonSize = new Vector3(0.045f, 0.25f, 0.064295f);
                 pagePoss[0] = new Vector3(0.56f, 0.65f, 0.45f);
@@ -790,13 +928,14 @@ namespace MysticClient.Mods
                 buttonSize = new Vector3(.09f, 4.8f, .08f);
                 buttonPos = new Vector3(.56f, 0, .23f);
                 buttonOffset = 1.2f;
+                settingButtonOffset = 2.351f;
                 //buttonTextPos = new Vector3(.064f, 0f, .089f);
                 //buttonTextOffset = 3f;
                 pageSize = 8;
                 toolTipZ = -.24f;
                 menuTitleZ = .133f;
             }
-            else if (Mode[23] == 11) // long
+            else if (Mode[23] == 15) // long
             {
                 parentSize = new Vector3(.1f, .3f, .4f);
                 pageButtonSize = new Vector3(0.045f, 0.25f, 0.064295f);
@@ -806,8 +945,10 @@ namespace MysticClient.Mods
                 menuPos = new Vector3(.05f, 0, -.205f);
                 buttonSize = new Vector3(.09f, .8f, .08f);
                 buttonPos = new Vector3(.56f, 0, .29f);
+                search = new Vector2(-.565f, -.77f);
                 buttonOffset = 1f;
                 internalButtonOffset = .13f;
+                settingButtonOffset = .35f;
                 //buttonTextPos = new Vector3(.064f, 0f, .112f);
                 //buttonTextOffset = 2.55f; // 3.05
                 buttonFontStyle = FontStyle.Normal;
@@ -822,33 +963,35 @@ namespace MysticClient.Mods
             }
         }
 
-        public static void SetUpKeyboard()
+        public static void ColorKeyboard(bool doOutline)
         {
-            keyboard.transform.position = menu.transform.position - new Vector3(0, .4f, .5f);
-            keyboard.transform.rotation = menu.transform.rotation;
-            SetUpKeyboardKeys();
+            var transform = keyboard.GetNamedChild("Keyboard").transform;
+            var outline = transform.gameObject.GetNamedChild("Outline");
+            if (doOutline)
+            {
+                outline.SetActive(true);
+                for (int i = 0; i < outline.transform.childCount; i++)
+                    outline.transform.GetChild(i).gameObject.ChangeColor(ButtonColorDisable);
+            } else outline.SetActive(false);
+            transform.gameObject.GetNamedChild("Back").ChangeColor(NormalColor);
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                var key = transform.GetChild(i).gameObject;
+                if (key.name.Length == 1 && key.name[0] >= 'A' && key.name[0] <= 'Z')
+                    key.ChangeColor(ButtonColorDisable);
+            }
         }
 
-        public static string inputtext = "";
-        private static List<GameObject> keys = new List<GameObject>();
-        private static void SetUpKeyboardKeys()
+        public static void SetUpKeyboard()
         {
-            keys.Clear();
-            for (int i = 0; i < keyboard.transform.childCount; i++)
-            {
-                var key = keyboard.transform.GetChild(i).gameObject;
-                keys.Add(key);
-                if (key.GetComponentInChildren<TextMesh>())
-                {
-                    var btn = key.AddComponent<KeyboardButton>();
-                    key.GetComponentInChildren<TextMesh>().font = currentFont;
-                    var keyText = key.GetComponentInChildren<TextMesh>().text;
-                    if (keyText == "<--") { btn.buttonAction =()=> { if (inputtext.Length > 0) inputtext = inputtext.Substring(0, inputtext.Length - 1); }; }
-                    else if (keyText == ">>>>>") btn.buttonAction =()=> Toggle("NextPage");
-                    else if (keyText == "<<<<<") btn.buttonAction = () => Toggle("PreviousPage");
-                    else { btn.buttonText = keyText == "____" ? " " : keyText; btn.buttonAction =()=> inputtext += btn.buttonText; }
-                }
-            }
+            var board = keyboard.GetNamedChild("Keyboard");
+            for (var letter = 'A'; letter <= 'Z'; letter++)
+                board.GetNamedChild(letter.ToString()).GetOrAddComponent<KeyboardButton>();
+            board.GetNamedChild("Exit").GetOrAddComponent<KeyboardButton>();
+            board.GetNamedChild("Delete").GetOrAddComponent<KeyboardButton>();
+            board.GetNamedChild("Next_Page").GetOrAddComponent<KeyboardButton>();
+            board.GetNamedChild("Previous_Page").GetOrAddComponent<KeyboardButton>();
+            board.GetNamedChild("Space").GetOrAddComponent<KeyboardButton>();
         }
 
         // thanks chatgpt

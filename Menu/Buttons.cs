@@ -26,6 +26,7 @@ using MysticClient.Notifications;
 using Photon.Pun;
 using Photon.Realtime;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
+using Unity.XR.CoreUtils;
 
 
 namespace MysticClient.Menu
@@ -42,7 +43,7 @@ namespace MysticClient.Menu
             {
                 new ButtonInfo[] // selections 0
                 {
-                    AddButton("Join Discord", ()=> Process.Start("https://discord.gg/AEB2huHmvT"), false, false, "Joined Discord"),
+                    AddButton("Join Discord", ()=> Process.Start("https://discord.gg/78d7rUVV9J"), false, false, "Joined Discord"),
                     AddButton("Settings", ()=> EnterPage(1), false, false, "Opened Settings"),
                     AddButton("Important Mods", ()=> EnterPage(2), false, false, "Opened Important Mods"),
                     AddButton("Movement Mods", ()=> EnterPage(3), false, false, "Opened Movement Mods"),
@@ -97,16 +98,20 @@ namespace MysticClient.Menu
                     AddButton("Jupiter Gravity", ()=> SetGravity(new Vector3(0f, -20f, 0f)), ()=> SetGravity(new Vector3(0f, -9.81f, 0f)), true, false, "Sets Gravity To High"),
                     AddButton("Reverse Gravity", ()=> SetGravity(new Vector3(0f, 9.81f, 0f)), ()=> SetGravity(new Vector3(0f, -9.81f, 0f)), true, false, "Reverses Your Gravity"),
                     AddButton("Space Gravity", ()=> SetGravity(Vector3.zero), ()=> SetGravity(new Vector3(0f, -9.81f, 0f)), true, false, "Sets Gravity To Nothing"),
-                    AddButton("Fly[X]", ()=> Fly(flySpeed), true, false, "X To Fly Forward"),
+                    AddButton("Fly[X]", ()=> Fly(), true, false, "X To Fly Forward"),
+                    AddButton("Velocity Fly[X]", ()=> VelocityFly(), true, false, "X To Gain A Forward Velocity"),
                     AddButton("Speed Boost", ()=> SetSpeedBoost(speedBoostSpeed), true, false, "Set Speed To " + speedBoostSpeed.ToString()),
                     AddButton("TPGun[RG][RT]", ()=> TPGun(), true, false, "Right Grip And Trigger To TP To Gun Point"),
                     AddButton("EnderPearl[RG]", ()=> EnderPearl(), true, false, "Right Grip To Spawn Pearl"),
                     AddButton("Bark Fly[J]", ()=> BarkFly(), true, false, "Joystick To Fly"),
-                    AddButton("IronMonke[G]", ()=> IronMonke(), true, false, "Grips To Use Iron Monke"),
+                    AddButton("IronMonke[G]", ()=> IronMonke(), true, false, "Grips To Use Iron Monke", ()=> EnterPage(6, 3)),
                     AddButton("Frozone[G]", ()=> Frozone(), true, false, "Grips To Slide On Platforms"),
-                    AddButton("To Tag Freeze", ()=> RigUtils.MyPlayer.disableMovement = false, true, false, "Makes It Where You Can Move When You Get Tagged"),
-                    AddButton("SpiderMonke[RG][LG]", ()=> SpiderMonke(), true, false, "Grips To Use Grapplers"),
-                    AddButton("Pull Speed[RG]", ()=> Pull(), true, false, "When You Stop Touching The Ground And Your Holding Right Grip You Go Forward (thx Zav)"),
+                    AddButton("No Tag Freeze", ()=> RigUtils.MyPlayer.disableMovement = false, true, false, "Makes It Where You Can Move When You Get Tagged"),
+                    AddButton("SpiderMonke[RG][LG]", ()=> SpiderMonke(), ()=> SpiderMonkeOff(), true, false, "Grips To Use Grapplers"),
+                    //AddButton("Pull Speed[RG]", ()=> Pull(), true, false, "When You Stop Touching The Ground And Your Holding Right Grip You Go Forward (thx Zav)"), zav skidded it
+                    // AddButton("Fire Monke", ()=> IronMonkeN(), true, false, "Hawk Tuah"),
+                    AddButton("Walk Sim[LJ][WASD]", ()=> WalkSim(), true, false, "Left Joystick Or WASD To Walk With Your Rig"),
+                    AddButton("Airstrike Gun[RG][RT]", ()=> AirstrikeGun(), true, false, "Right Grip And Trigger To Air-Strike Yourself Into The Ground"),
                 },
 
                 new ButtonInfo[] // rig 4
@@ -115,6 +120,8 @@ namespace MysticClient.Menu
                     AddButton("GhostMonke[A]", ()=> GhostMonke(), true, false, "A For GhostMonke"),
                     AddButton("InvisMonke[A]", ()=> InvisMonke(), true, false, "A For InvisMonke"),
                     AddButton("GrabRig[RG]", ()=> GrabRig(), true, false, "Right Grip To Grab Rig"),
+                    AddButton("ThrowRig[RG][A]", ()=> ThrowRig(), true, false, "Right Grip To Grab Rig And Release To Throw And A To Reset"),
+                    AddButton("RigGun[RG][RT]", ()=> RigGun(), true, false, "Right Grip And Trigger To Put Rig Up Ponter"),
                     AddButton("HeadSpin[X]", ()=> HeadTask("HeadSpinX"), ()=> HeadTask("Fix Head"), true, false, "Spins Head On X Axis"),
                     AddButton("HeadSpin[Y]", ()=> HeadTask("HeadSpinY"), ()=> HeadTask("Fix Head"), true, false, "Spins Head On Y Axis"),
                     AddButton("HeadSpin[Z]", ()=> HeadTask("HeadSpinZ"), ()=> HeadTask("Fix Head"), true, false, "Spins Head On Z Axis"),
@@ -122,6 +129,7 @@ namespace MysticClient.Menu
                     AddButton("180 Head", ()=> HeadTask("180 Head"), ()=> HeadTask("Fix Head"), true, false, "Turns Head 180 On Z Axis"),
                     AddButton("RGBMonke[CS]", ()=> SetOfflineColor(RGBColor()), true, false, "Made Your Rig Color RGB"),
                     AddButton("WackyMonke", ()=> WackyMonke(), true, false, "Made Your Rig Look Wacky"),
+                    //AddButton("Leg Mod", ()=> LegMod(true), ()=> LegMod(false), true, false, "Made Your Arms Turn Into Legs"),
                 },
 
                 new ButtonInfo[] // spammers 5
@@ -130,7 +138,7 @@ namespace MysticClient.Menu
                     AddButton("Projectiles", ()=> EnterPage(0, 2), false, false, "Opended Projectile Spammers"),
                     AddButton("Water", ()=> EnterPage(1, 2), false, false, "Opened Water Spammers"),
                     AddButton("Sound", ()=> EnterPage(2, 2), false, false, "Opened Sound Spammers"),
-                    AddButton("Block", ()=> EnterPage(3, 2), false, false, "Opened Block Spammers"),
+                    //AddButton("Block", ()=> EnterPage(3, 2), false, false, "Opened Block Spammers"),
                 },
 
                 new ButtonInfo[] // fun 6
@@ -154,6 +162,8 @@ namespace MysticClient.Menu
                     AddButton("Spaz Glider[RT]", ()=> SpazGliders(), true, false, "Right Trigger To Spaz Gliders"),
                     AddButton("Glider Halo", ()=> GliderHalo(), true, false, "Halos Gliders Above Your Head"),
                     AddButton("Gain Velocity[T]", ()=> GainVelocity(), true, false, "Triggers To Gain Velocity Best Use For Gliders"),
+                    AddButton("Car Monke[RJ]", ()=> CarMonke(), ()=> car.SetActive(false), true, false, "Right Joystick To Drive Car"),
+                    AddButton("Spam Trigger", ()=> SpamGrab(), true, false, "Spams A Snowball When In Grab Zones"),
                 },
 
                 new ButtonInfo[] // amimal 7
@@ -196,7 +206,8 @@ namespace MysticClient.Menu
                     //AddButton("Ropes Down Gun[RG][RT]", ()=> RopeDownGun("Ropes Down Gun[RG][RT]"), true, false, "Right Grap And Trigger To Make Target Rope Go Down"),
                     AddButton("Ropes Spaz[RT]", ()=> RopeSpaz("Ropes Spaz[RT]"), true, false, "Right Trigger To Make Ropes Spaz"),
                     //AddButton("Ropes Spaz Gun[RG][RT]", ()=> SpazRopeGun("Ropes Spaz Gun[RG][RT]"), true, false, "Right Grap And Trigger To Make Target Rope Spaz"),
-                    //AddButton("Kick Gun[RG][RT]", ()=> KickGun(), true, false, "Right Grap And Trigger To Kick Target Player"), no
+                    //AddButton("Kick Gun[RG][RT]", ()=> KickGun(), true, false, "Right Grip And Trigger To Kick Target Player"), // you really thought
+                    //AddButton("Lag Gun[RG][RT]", ()=> LagGun(), true, false, "Right Grip And Trigger To Lag Target Player"),
                 },
                 // AddButton("", ()=> , ()=> , true, false, ""),
                 new ButtonInfo[] // visuals 9
@@ -244,7 +255,8 @@ namespace MysticClient.Menu
                 {
                     AddButton("Exit Menu Settings", ()=> EnterPage(1), false, false, "Closed Menu Settings"),
                     AddButton("Right Hand Menu", false, "Put Menu On Right Hand"),
-                    AddButton("Side Disconnect", false, "Put Disconnect Button On Menus Side"),
+                    AddButton("Side Disconnect", false, "Puts A Disconnect Button On Menus Side"),
+                    AddButton("Return Button", false, "Puts A Return Button Next To The Search Button"),
                     AddButton("Menu Color: Black", ()=> ChangeMenuColor("Changed Menu Color"), false, false, "Changed Menu Color"),
                     AddButton("Outline Menu", false, "Puts An Outline On The Menu"),
                     AddButton("Outline Color: Black", ()=> ChangeMenuOutlineColor("Changed Outline Color"), false, false, "Changed Outline Color"),
@@ -267,17 +279,20 @@ namespace MysticClient.Menu
                     AddButton("Button Sound: Click", ()=> ChangeButtonSound("Changed Button Sound"), false, false, "Changed Button Sound"),
                     //AddButton("Date Time", false, "Shows Date Time Above Menu"), doesnt look that good
                     //AddButton("ServerSided Button Sounds", false, "Makes Button Sounds Server Sided"),
-                    AddButton("Dynamic Sounds", false, "Gives The Menu A Nice User Sounds"),
-                    AddButton("Menu Trail", false, "Makes The Menu Have A Trail That Follows It"),
-                    AddButton("Menu Trail Color: Black", ()=> ChangeMenuTrailColor("Changed Menu Trail Color"), false, false, "Changed Menu Trail Color"),
-                    AddButton("Make Menu Trail Color Follow Menu Color", false, "Makes The Menu Trail Color Follow The Menu Color"),
+                    AddButton("Dynamic Sounds", ()=> { if (fastLoad) { GetIndex("Dynamic Sounds").enabled = false; SendNotification(NotifUtils.Warning() + "Config 'Fast Load' is enabled this setting is now unuseable"); } }, true, false, "Gives The Menu A Nice User Sounds"),
+                    AddButton("Menu Trail", false, "Makes The Menu Have A Trail That Follows It", ()=> EnterPage(4, 3)),
                     AddButton("Use System Colors", false, "Make Color Changers Use System.Drawing.Color Instead Of UnityEngine.Color"),
                     AddButton("Annoying Menu", false, "You Would Never Get Annoyed Of This Menu. Right?"),
                     AddButton("Menu Font: Arial", ()=> ChangeFont("Changed Menu Font"), false, false, "Changed Menu Font"),
-                    AddButton("Array List", false, "Puts An Array Of All Your Enabled Mods On Screen"),
-                    AddButton("Array List Buttons", false, "Adds A Disable Button Next To The Array List Text"),
+                    AddButton("Array List", false, "Puts An Array Of All Your Enabled Mods On Screen", ()=> EnterPage(5, 3)),
                     AddButton("Shiny Menu", false, "Makes The Menu Have A Shiny Look"),
                     AddButton("Disable Stump Planet", false, "Disables The Planet In Stump"),
+                    AddButton("No Button Colliders", false, "Makes It So You Cant Use The Menu As A Platform"),
+                    AddButton("Face Menu", false, "Makes The Menu Show Infront Of Your Face"),
+                    AddButton("Semi-Transparent Menu", false, "Makes The Menu Semi-Transparent"),
+                    AddButton("Round Menu", false, "Rounds The Menu"),
+                    AddButton("Text UI Menu", false, "Adds A Text UI To Use Instead Of The Menu"),
+                    AddButton("Current Catagory Searching", false, "Makes It Where When You Search It Will Only Show The Mods That Are In Your Current Catagory"),
                 },
 
                 new ButtonInfo[] // rig settings 1
@@ -308,6 +323,7 @@ namespace MysticClient.Menu
                     AddButton("Speed Boost Speed: Normal", ()=> ChangeSpeedBoostSpeed("Changed Speed Boost Speed"), true, false, "Changed Speed Boost Speed"),
                     AddButton("Super Speed Boost", false, "Makes The Speed Boost Mod Super"),
                     AddButton("Time Of Day: Untouched", ()=> ChangeTimeOfDay("Changed Time Of Day"), true, false, "Changed Time Of Day"),
+                    AddButton("Load Audios[LAG SPIKE!]", ()=> LoadAudios("Load Audios[LAG SPIKE!]"), true, false, "Loads All Audios When Comfirmed"),
                     //AddButton("Disable Wind", ()=> SetWind(false), ()=> SetWind(true), true, false, "Disabled Wind"), not working
                 },
 
@@ -346,6 +362,7 @@ namespace MysticClient.Menu
                     AddButton("Receive Ball Guns", ()=> NetworkBalls(), ()=> UnNetworkBalls(), true, false, "Enabled Your Ball Gun Receiver"),
                     AddButton("Receive Frozones", ()=> NetworkFrozone(), ()=> UnNetworkFrozone(), true, false, "Enabled Your Frozone Receiver"),
                     AddButton("Receive Projectiles", ()=> NetworkProjectiles(), ()=> UnNetworkProjectiles(), true, false, "Enabled Your Projectile Receiver"),
+                    AddButton("Receive Minecraft", ()=> NetworkMinecraft(), ()=> UnNetworkMinecraft(), true, false, "Enabled Your Minecraft Receiver"),
                     AddButton("Disable Platform Network Colliders", ()=> NetworkColliders = false, ()=> NetworkColliders = true, true, false, "Disables Platform Networks Colliders"),
                 },
 
@@ -449,23 +466,101 @@ namespace MysticClient.Menu
                 new ButtonInfo[] // minecraft 4
                 {
                     AddButton("Exit Minecraft", ()=> EnterPage(6), false, false, "Closed Minecraft"),
-                    AddButton("Minecraft Mod[RG][RT]", ()=> Minecraft(), true, false, "Right Grip And Trigger To Spawn Block On Grid"),
+                    AddButton("Minecraft Mod[RG][RT]", ()=> Minecraft(), true, false, "Right Grip And Trigger To Spawn Block On Grid", ()=> EnterPage(3, 3)),
+                    AddButton("Pickaxe", false,  "Puts A Pickaxe On Your Hand Which You Can Break Block With", ()=> EnterPage(1, 3)),
                     AddButton("Destroy Minecraft Cubes[A]", ()=> ClearMCCubes("Destroy Minecraft Cubes[A]"), true, false, "Destroys Minecraft Cubes If You Press A"),
                     AddButton("Destroy Minecraft Cubes Gun[RG][RT]", ()=> DestroyMCBlockGun(), true, false, "Right Grip And Trigger To Destroy Minecraft Cube"),
                     AddButton("Remove Minecraft Block Collider Gun[RG][RT]", ()=> RemoveMCBlockCollider(), true, false, "Right Grip And Trigger To Remove Minecraft Block Collider"),
                     AddButton("Add Minecraft Block Collider[RG][RT]", ()=> AddMCBlockCollider(), true, false, "Right Grip And Trigger To Add Minecraft Block Collider"),
 
-                    //AddButton("Make Block Semi-Transparent[RG][RT]", ()=> MakeMCBlockTransparent(GetChangeColorA(Color.white, .3f)), true, false, "Right Grip And Trigger To Make Block Semi-Transparent"),
-                    //AddButton("Make Block Not Semi-Transparent[RG][RT]", ()=> MakeMCBlockTransparent(Color.white), true, false, "Right Grip And Trigger To Make Block Not Semi-Transparent"),
-                    //AddButton("Make Block Shader Defualt[RG][RT]", ()=> ChangeMCShader(DefaultShader), true, false, "Right Grip And Trigger To Change Block Shader Defualt"),
-                    //AddButton("Make Block Shader Universal[RG][RT]", ()=> ChangeMCShader(UniversalShader), true, false, "Right Grip And Trigger To Change Block Shader Universal"),
+                    AddButton("Mincraft Cube Texture: Grass", ()=> ChangeMCTexture("Changed Minecraft Block Texture"), false, false, "Changed Minecraft Block Texture",  ()=> EnterPage(0, 3)),
 
-                    AddButton("Mincraft Cube Texture: Grass", ()=> ChangeMCTexture("Changed Minecraft Block Texture"), false, false, "Changed Minecraft Block Texture"),
+                    AddButton("Minecraft Song: Living Mice", ()=> ChangeMCSong("Changed Minecraft Song"), false, false, "Changed Minecraft Song", ()=> EnterPage(2, 3)),
 
-                    AddButton("Minecraft Song: Living Mice", ()=> ChangeMCSong("Changed Minecraft Song"), false, false, "Changed Minecraft Song"),
-
-                    AddButton("Play Song", ()=> PlayMinecraftSong(false), false, false, "Playing Current Set Minecraft Song"),
+                    AddButton("Play Song", ()=> { if (fastLoad) { GetIndex("Play Song").enabled = false; SendNotification(NotifUtils.Warning() + "Config 'Fast Load' is enabled this mod is now unuseable"); } else PlayMinecraftSong(false); }, false, false, "Playing Current Set Minecraft Song"),
                     AddButton("Stop Song", ()=> PlayMinecraftSong(true), false, false, "Stopped Current Set Minecraft Song"),
+                    AddButton("Raise Volume", ()=> Loaders.MCObject.volume += .1f, false, false, "Raised Minecraft Music Volume"),
+                    AddButton("Lower Volume", ()=> Loaders.MCObject.volume -= .1f, false, false, "Lowered Minecraft Music Volume"),
+
+                    AddButton("Save Current Minecraft Build", ()=> SaveMinecraftCubes(), false, false, "Saved Save File To MysticClient/Saving/LastMinecraftCubes.json"),
+                    AddButton("Loaded Last Minecraft Build Save", ()=> LoadMinecraftCubes(), false, false, "Loaded Save File From MysticClient/Saving/LastMinecraftCubes.json"),
+
+                    //AddButton("Loop Audio", ()=> Loaders.MCObjectLoop = true, ()=> Loaders.MCObjectLoop = false, true, false, "Makes The Minecraft Music Loop"),
+                },
+            },
+
+
+            new ButtonInfo[][] // other settings 3
+            {
+                new ButtonInfo[] // minecraft blocks 0
+                {
+                    AddButton("Exit MC Texture Settings", ()=> EnterPage(4, 2), false, false, "Closed MC Texture Settings"),
+                    AddButton("Make Texture Grass", ()=> {mcBlockTexture = MCTextures[0]; Settings.Mode[26] = 0; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Texture Dirt", ()=> {mcBlockTexture = MCTextures[1]; Settings.Mode[26] = 1; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Texture Wood", ()=> {mcBlockTexture = MCTextures[2]; Settings.Mode[26] = 2; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Texture Leaf", ()=> {mcBlockTexture = MCTextures[3]; Settings.Mode[26] = 3; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Texture Plank", ()=> {mcBlockTexture = MCTextures[4]; Settings.Mode[26] = 4; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Texture Stone", ()=> {mcBlockTexture = MCTextures[5]; Settings.Mode[26] = 5; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Texture Cobblestone", ()=> {mcBlockTexture = MCTextures[6]; Settings.Mode[26] = 6; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Texture HayBale", ()=> {mcBlockTexture = MCTextures[7]; Settings.Mode[26] = 7; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Texture Glass", ()=> {mcBlockTexture = MCTextures[8]; Settings.Mode[26] = 8; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Texture Obsidian", ()=> {mcBlockTexture = MCTextures[9]; Settings.Mode[26] = 9; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Texture Water", ()=> {mcBlockTexture = MCTextures[10]; Settings.Mode[26] = 10; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Texture TrapDoor", ()=> {mcBlockTexture = MCTextures[11]; Settings.Mode[26] = 11; }, false, false, "Guess What Just Happened"),
+                },
+
+                new ButtonInfo[] // minecraft pickaxe settings 1
+                {
+                    AddButton("Exit Pickaxe Settings", ()=> EnterPage(4, 2), false, false, "Closed Pickaxe Settings"),
+                    AddButton("Max Strike Count: 4", ()=> ChangeMinecraftPickaxeMaxStrike("Changed Max Pickaxe Strike Count"), false, false, "Changed Max Pickaxe Strike Count"),
+                    AddButton("No Hit Delay", false, "Removes The Hit Delay On The Pickaxe"),
+                },
+
+                new ButtonInfo[] // minecraft songs 2
+                {
+                    AddButton("Exit MC Song Settings", ()=> EnterPage(4, 2), false, false, "Closed MC Song Settings"),
+                    AddButton("Make Song Living Mice", ()=> {mcSongClip = mcSongClip = AudioClips[9]; Settings.Mode[27] = 9; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Song Clark", ()=> {mcSongClip = mcSongClip = AudioClips[10]; Settings.Mode[27] = 10; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Song Danny", ()=> {mcSongClip = mcSongClip = AudioClips[11]; Settings.Mode[27] = 11; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Song Oxygene", ()=> {mcSongClip = mcSongClip = AudioClips[12]; Settings.Mode[27] = 12; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Song Key", ()=> {mcSongClip = mcSongClip = AudioClips[13]; Settings.Mode[27] = 13; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Song Droopy Likes Your Face", ()=> {mcSongClip = mcSongClip = AudioClips[14]; Settings.Mode[27] = 14; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Song Moog City", ()=> {mcSongClip = mcSongClip = AudioClips[15]; Settings.Mode[27] = 15; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Song Moog City 2", ()=> {mcSongClip = mcSongClip = AudioClips[16]; Settings.Mode[27] = 16; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Song Subwoofer Lullaby", ()=> {mcSongClip = mcSongClip = AudioClips[17]; Settings.Mode[27] = 17; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Song Dog", ()=> {mcSongClip = mcSongClip = AudioClips[18]; Settings.Mode[27] = 18; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Song Cat", ()=> {mcSongClip = mcSongClip = AudioClips[19]; Settings.Mode[27] = 19; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Song Aria Math", ()=> {mcSongClip = mcSongClip = AudioClips[20]; Settings.Mode[27] = 20; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Song Haggstorm", ()=> {mcSongClip = mcSongClip = AudioClips[21]; Settings.Mode[27] = 21; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Song Pigstep", ()=> {mcSongClip = mcSongClip = AudioClips[22]; Settings.Mode[27] = 22; }, false, false, "Guess What Just Happened"),
+                    AddButton("Make Song Pigstep (Alan Becker)", ()=> {mcSongClip = mcSongClip = AudioClips[23]; Settings.Mode[27] = 23; }, false, false, "Guess What Just Happened"),
+                },
+
+                new ButtonInfo[] // minecraft mod setting :3
+                {
+                    AddButton("Exit MC Mod Settings", ()=> EnterPage(4, 2), false, false, "Closed MC Mod Settings"),
+                    AddButton("Left Hand", false, "Puts Minecraft Mod On Your Left Hand"),
+                },
+
+                new ButtonInfo[] // menu trail settings 4
+                {
+                    AddButton("Exit Menu Trail Settings", ()=> EnterPage(0, 1), false, false, "Closed Menu Trail Settings"),
+                    AddButton("Menu Trail Color: Black", ()=> ChangeMenuTrailColor("Changed Menu Trail Color"), false, false, "Changed Menu Trail Color"),
+                    AddButton("Make Menu Trail Color Follow Menu Color", false, "Makes The Menu Trail Color Follow The Menu Color"),
+                },
+
+                new ButtonInfo[] // array list setting 5
+                {
+                    AddButton("Exit Array List Settings", ()=> EnterPage(0, 1), false, false, "Closed Array List Settings"),
+                    AddButton("Array List Buttons", false, "Adds A Disable Button Next To The Array List Text"),
+                    AddButton("Small Array List", false, "Makes The Array List Small"),
+                },
+
+                new ButtonInfo[] // iron monke settings 6
+                {
+                    AddButton("Exit IronMonke Settings", ()=> EnterPage(0, 3), false, false, "Closed IronMonke Settings"),
+                    AddButton("Fire Trails", false, "Makes IronMonke Have Trails When You Fly"),
+                    AddButton("Fire Particles", false, "Makes IronMonke Have Particles When You Fly"),
                 },
             },
 
@@ -476,6 +571,8 @@ namespace MysticClient.Menu
             AddButton("Last Page", ()=> Toggle("PreviousPage"), false, "Switched Page"),
             AddButton("Destroy Networked Objects", ()=> Toggle("DestroyButton"), false, "Destroyed Networked Objects"),
             AddButton("Take A Screenshot", ()=> { SteamScreenshots.TriggerScreenshot(); SendNotification(NotifUtils.Menu() + "Saved Screenshot Using Steam"); }, false, "Took A Screenshot Using Steam"),
+            AddButton("Search", ()=> Toggle("Search"), false, "Started Search"),
+            AddButton("Stop Search", ()=> inKeyboard = false, false, "Stopped Search"),
             // voice commands
         };
 
@@ -486,7 +583,7 @@ namespace MysticClient.Menu
 
 
 
-        private static ButtonInfo AddButton(string text, bool enabled = false, string toolTip = "PlaceHolder")
+        public static ButtonInfo AddButton(string text, bool enabled = false, string toolTip = "PlaceHolder")
         {
             return new ButtonInfo
             {
@@ -495,10 +592,24 @@ namespace MysticClient.Menu
                 disableMethod = null,
                 isTogglable = true,
                 enabled = enabled,
-                toolTip = toolTip
+                toolTip = toolTip,
+                settingAction = null
             };
         }
-        private static ButtonInfo AddButton(string text, Action method, bool isToggleable = true, bool enabled = false, string toolTip = "PlaceHolder")
+        public static ButtonInfo AddButton(string text, bool isTogglable = true, bool enabled = false, string toolTip = "PlaceHolder")
+        {
+            return new ButtonInfo
+            {
+                buttonText = text,
+                method = null,
+                disableMethod = null,
+                isTogglable = isTogglable,
+                enabled = enabled,
+                toolTip = toolTip,
+                settingAction = null
+            };
+        }
+        public static ButtonInfo AddButton(string text, Action method, bool isToggleable = true, bool enabled = false, string toolTip = "PlaceHolder")
         {
             return new ButtonInfo
             {
@@ -507,10 +618,11 @@ namespace MysticClient.Menu
                 disableMethod = null,
                 isTogglable = isToggleable,
                 enabled = enabled,
-                toolTip = toolTip
+                toolTip = toolTip,
+                settingAction = null,
             };
         }
-        private static ButtonInfo AddButton(string text, Action method, Action disableMethod, bool isToggleable = true, bool enabled = false, string toolTip = "PlaceHolder")
+        public static ButtonInfo AddButton(string text, Action method, Action disableMethod, bool isToggleable = true, bool enabled = false, string toolTip = "PlaceHolder")
         {
             return new ButtonInfo
             {
@@ -519,10 +631,11 @@ namespace MysticClient.Menu
                 disableMethod = disableMethod,
                 isTogglable = isToggleable,
                 enabled = enabled,
-                toolTip = toolTip
+                toolTip = toolTip,
+                settingAction = null
             };
         }
-        private static ButtonInfo[][] AddButton(string text, Action method, bool isToggleable = true, string toolTip = "PlaceHolder") // this if for voice commands
+        public static ButtonInfo[][] AddButton(string text, Action method, bool isToggleable = true, string toolTip = "PlaceHolder") // this if for voice commands
         {
             return new ButtonInfo[][]
             {
@@ -535,17 +648,59 @@ namespace MysticClient.Menu
                         disableMethod = null,
                         isTogglable = isToggleable,
                         enabled = false,
-                        toolTip = toolTip
+                        toolTip = toolTip,
+                        settingAction = null
                     }
                 }
             };
         }
-        private static int[] crystalIndex = new int[]
+
+        public static ButtonInfo AddButton(string text, Action method, bool isToggleable = true, bool enabled = false, string toolTip = "PlaceHolder", Action settingAction = null)
+        {
+            return new ButtonInfo
+            {
+                buttonText = text,
+                method = method,
+                disableMethod = null,
+                isTogglable = isToggleable,
+                enabled = enabled,
+                toolTip = toolTip,
+                settingAction = settingAction
+            };
+        }
+        public static ButtonInfo AddButton(string text, Action method, Action disableMethod, bool isToggleable = true, bool enabled = false, string toolTip = "PlaceHolder", Action settingAction = null)
+        {
+            return new ButtonInfo
+            {
+                buttonText = text,
+                method = method,
+                disableMethod = disableMethod,
+                isTogglable = isToggleable,
+                enabled = enabled,
+                toolTip = toolTip,
+                settingAction = settingAction
+            };
+        }
+        public static ButtonInfo AddButton(string text, bool enabled = false, string toolTip = "PlaceHolder", Action settingAction = null)
+        {
+            return new ButtonInfo
+            {
+                buttonText = text,
+                method = null,
+                disableMethod = null,
+                isTogglable = true,
+                enabled = enabled,
+                toolTip = toolTip,
+                settingAction = settingAction
+            };
+        }
+
+        public static int[] crystalIndex = new int[]
         {
             UnityEngine.Random.Range(40, 54),
             UnityEngine.Random.Range(214, 221)
         };
-        private static void QuitGame()
+        public static void QuitGame()
         {
             Disconnect();
             Quit();

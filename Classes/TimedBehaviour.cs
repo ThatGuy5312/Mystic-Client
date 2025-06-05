@@ -11,10 +11,7 @@ namespace MysticClient.Classes
         protected bool paused = false;
         protected float startTime;
         protected float duration = 2f;
-        public virtual void Start()
-        {
-            startTime = Time.time;
-        }
+        public virtual void Start() => startTime = Time.time;
         public virtual void Update()
         {
             if (!complete)
@@ -26,9 +23,6 @@ namespace MysticClient.Classes
                 }
             }
         }
-        public virtual void OnLoop()
-        {
-            startTime = Time.time;
-        }
+        public virtual void OnLoop() => startTime = Time.time;
     }
 }

@@ -1,7 +1,6 @@
 ﻿using BepInEx;
 using GorillaLocomotion.Gameplay;
 using GorillaNetworking;
-using HarmonyLib;
 using MysticClient.Classes;
 using Unity.XR.CoreUtils;
 using MysticClient.Utils;
@@ -15,110 +14,109 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
-using WebSocketSharp;
 using static MysticClient.Menu.Buttons;
 using static MysticClient.Menu.MenuSettings;
 using MysticClient.Mods;
 using TMPro;
-using BepInEx.Bootstrap;
 using System.Reflection;
 using SColor = System.Drawing.Color;
 using System.Collections.Generic;
 using Random = UnityEngine.Random;
 using System.Threading.Tasks;
-using UnityEngine.Video;
+using MysticClient.Notifications;
+using UnityEngine.XR;
+using GorillaExtensions;
 
 namespace MysticClient.Menu
 {
-    [HarmonyPatch(typeof(GorillaLocomotion.Player), "LateUpdate")]
+    //[HarmonyPatch(typeof(GorillaLocomotion.Player), "LateUpdate")]
     public class Main : MonoBehaviour
     {
-        public static GorillaPaintbrawlManager GorillaPaintbrawlManager { get { return GameObject.Find("Gorilla Battle Manager").GetComponent<GorillaPaintbrawlManager>(); } }
-        public static GorillaTagManager GorillaTagManager { get { return GameObject.Find("Gorilla Tag Manager").GetComponent<GorillaTagManager>(); } }
-        public static GorillaHuntManager GorillaHuntManager { get { return GorillaGameManager.gameObject.GetComponent<GorillaHuntManager>(); } }
-        public static GorillaGameManager GorillaGameManager { get { return GorillaGameManager.instance; } }
-        public static NetworkSystem PhotonSystem { get { return NetworkSystem.Instance; } }
-        public static PhotonNetworkController NetworkController { get { return PhotonNetworkController.Instance; } }
-        public static ControllerInputPoller Controller { get { return ControllerInputPoller.instance; } }
-        public static IInputSystem UserInput { get { return UnityInput.Current; } }
+        public static GorillaPaintbrawlManager GorillaPaintbrawlManager => GameObject.Find("Gorilla Battle Manager").GetComponent<GorillaPaintbrawlManager>();
+        public static GorillaTagManager GorillaTagManager => GameObject.Find("Gorilla Tag Manager").GetComponent<GorillaTagManager>();
+        public static GorillaHuntManager GorillaHuntManager => GorillaGameManager.gameObject.GetComponent<GorillaHuntManager>();
+        public static GorillaGameManager GorillaGameManager => GorillaGameManager.instance;
+        public static NetworkSystem PhotonSystem => NetworkSystem.Instance;
+        public static PhotonNetworkController NetworkController => PhotonNetworkController.Instance;
+        public static ControllerInputPoller Controller => ControllerInputPoller.instance;
+        public static IInputSystem UserInput => UnityInput.Current;
 
-        public static void Prefix()
+        void Update()
         {
             try
             {
-                if (!inKeyboard)
+                var toOpen = (!GetEnabled("Right Hand Menu") && Controller.leftControllerSecondaryButton) || (GetEnabled("Right Hand Menu") && Controller.rightControllerSecondaryButton);
+                var keyboardOpen = UserInput.GetKey(KeyCode.Q);
+                if (menu == null)
                 {
-                    var toOpen = (!GetEnabled("Right Hand Menu") && Controller.leftControllerSecondaryButton) || (GetEnabled("Right Hand Menu") && Controller.rightControllerSecondaryButton);
-                    var keyboardOpen = UserInput.GetKey(KeyCode.Q);
-                    if (menu == null)
+                    if ((toOpen || keyboardOpen) && !GetEnabled("Text UI Menu") && !inKeyboard)
                     {
-                        if (toOpen || keyboardOpen)
-                        {
-                            CreateMenu();
-                            RecenterMenu(GetEnabled("Right Hand Menu"), keyboardOpen);
-                            if (reference == null) CreateReference(GetEnabled("Right Hand Menu"));
-                            if (GetEnabled("Dynamic Sounds")) Loaders.PlayAudio(AudioClips[5]);
-                        }
+                        CreateMenu();
+                        RecenterMenu(GetEnabled("Right Hand Menu"), keyboardOpen);
+                        if (reference == null) CreateReference(GetEnabled("Right Hand Menu"));
+                        if (GetEnabled("Dynamic Sounds")) Loaders.PlayAudio(AudioClips[5]);
                     }
-                    else
+                }
+                else
+                {
+                    if ((toOpen || keyboardOpen) && !inKeyboard)
                     {
-                        if (toOpen || keyboardOpen)
+                        RecenterMenu(GetEnabled("Right Hand Menu"), keyboardOpen);
+                        if (reference == null) CreateReference(GetEnabled("Right Hand Menu"));
+                        if (menu.GetComponent<Rigidbody>()) { Destroy(menu.GetComponent<Rigidbody>()); if (GetEnabled("Dynamic Sounds")) Loaders.PlayAudio(AudioClips[5]); }
+                    }
+                    else if (!(toOpen || keyboardOpen) && !menu.GetComponent<Rigidbody>())
+                    {
+                        if (!inKeyboard)
                         {
-                            RecenterMenu(GetEnabled("Right Hand Menu"), keyboardOpen);
-                            if (reference == null) CreateReference(GetEnabled("Right Hand Menu"));
-                            if (menu.GetComponent<Rigidbody>()) { Destroy(menu.GetComponent<Rigidbody>()); if (GetEnabled("Dynamic Sounds")) Loaders.PlayAudio(AudioClips[5]); }
-                        }
-                        else if (!(toOpen || keyboardOpen) && !menu.GetComponent<Rigidbody>())
-                        {
+                            TPC.gameObject.GetNamedChild("CM vcam1").SetActive(true);
                             if (physicSetting == 1 || physicSetting == 2)
                             {
-                                var menuRB = menu.AddComponent(typeof(Rigidbody)) as Rigidbody;
-                                menuRB.detectCollisions = true; menuRB.isKinematic = false;
-                                var spin = new Vector3(Random.Range(-1f, 1f), Random.Range(-1f, 1f), Random.Range(-1f, 1f)).normalized * 175f;
-                                var tracker = GetEnabled("Right Hand Menu") ? RigUtils.MyPlayer.rightHandCenterVelocityTracker : RigUtils.MyPlayer.leftHandCenterVelocityTracker;
+                                var menuRB = menu.AddComponent<Rigidbody>();
                                 menuRB.useGravity = !GetEnabled("Zero Gravity Menu");
-                                menu.GetComponent<Rigidbody>().AddTorque(Random.insideUnitSphere * 275f);
-                                menu.GetComponent<Rigidbody>().AddTorque(spin);
-                                menuRB.velocity = tracker.GetAverageVelocity(true, 0); Destroy(reference); reference = null;
+                                var tracker = GetEnabled("Right Hand Menu") ? RigUtils.MyPlayer.rightHandCenterVelocityTracker : RigUtils.MyPlayer.leftHandCenterVelocityTracker;
+                                menuRB.velocity = tracker.GetAverageVelocity(true, 0);
+                                menuRB.angularVelocity = MUtils.VelocityHandEstimator(GetEnabled("Right Hand Menu") ? "RightHand Controller" : "LeftHand Controller").angularVelocity;
+                                reference.Destroy(); reference = null;
+                                referenceOther?.Destroy(); referenceOther ??= null;
                                 if (GetEnabled("Dynamic Sounds")) Loaders.PlayAudio(AudioClips[6]);
-                                if (GetEnabled("Multi Create")) { Destroy(menu, destroyDelay); menu = null; }
+                                if (GetEnabled("Multi Create")) { menu.Destroy(destroyDelay); menu = null; }
                             }
                             else if (physicSetting == 0)
                             {
-                                if (GetEnabled("Dynamic Sounds"))
-                                    Loaders.PlayAudio(AudioClips[6]);
+                                if (GetEnabled("Dynamic Sounds")) Loaders.PlayAudio(AudioClips[6]);
                                 if (GetEnabled("Multi Create"))
                                 {
-                                    Destroy(menu, destroyDelay);
+                                    menu.Destroy(destroyDelay);
                                     menu = null;
-                                    Destroy(reference);
+                                    reference.Destroy();
                                     reference = null;
+                                    referenceOther.Destroy();
+                                    referenceOther = null;
                                 }
                                 else DestroyMenu();
-                            }
-                        }
+                            } else physicSetting = 1;
+                        } else RecenterMenu(GetEnabled("Right Hand Menu"), true);
                     }
-                }             
+                }
                 try
                 {
                     if (!RigUtils.MyOfflineRig.enabled)
                     {
                         if (Rig.GhostType == 1)
                         {
-                            if (rightGhostHand == null)
-                                rightGhostHand = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                            rightGhostHand ??= GameObject.CreatePrimitive(PrimitiveType.Cube);
                             rightGhostHand.transform.position = RigUtils.MyOnlineRig.rightHandTransform.position;
-                            rightGhostHand.transform.Rotate(1f, 1f, 1f);
-                            rightGhostHand.transform.localScale = new Vector3(0.15f, 0.15f, 0.15f) * RigUtils.MyPlayer.scale;
+                            rightGhostHand.transform.Rotate(1, 1, 1);
+                            rightGhostHand.transform.localScale = new Vector3(.15f, .15f, .15f) * RigUtils.MyPlayer.scale;
                             rightGhostHand.transform.GetComponent<Renderer>().material = TransparentMaterial(GetChangeColorA(NormalColor, .15f));
-                            if (leftGhostHand == null)
-                                leftGhostHand = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                            leftGhostHand ??= GameObject.CreatePrimitive(PrimitiveType.Cube);
                             leftGhostHand.transform.position = RigUtils.MyOnlineRig.leftHandTransform.position;
-                            leftGhostHand.transform.Rotate(1f, 1f, 1f);
-                            leftGhostHand.transform.localScale = new Vector3(0.15f, 0.15f, 0.15f) * RigUtils.MyPlayer.scale;
+                            leftGhostHand.transform.Rotate(1, 1, 1);
+                            leftGhostHand.transform.localScale = new Vector3(.15f, .15f, .15f) * RigUtils.MyPlayer.scale;
                             leftGhostHand.transform.GetComponent<Renderer>().material = TransparentMaterial(GetChangeColorA(NormalColor, .15f));
-                            Destroy(rightGhostHand.GetComponent<Collider>());
-                            Destroy(leftGhostHand.GetComponent<Collider>());
+                            rightGhostHand.Destroy<Collider>();
+                            leftGhostHand.Destroy<Collider>();
                         }
                         else if (Rig.GhostType == 2)
                         {
@@ -128,6 +126,7 @@ namespace MysticClient.Menu
                                 Ghost.headBodyOffset = Vector3.zero;
                                 Ghost.enabled = true;
                             }
+                            Ghost.gameObject.SetActive(true);
                             Ghost.mainSkin.material = TransparentMaterial(GetChangeColorA(NormalColor, .5f));
                             Ghost.headConstraint.transform.position = RigUtils.MyPlayer.headCollider.transform.position;
                             Ghost.headConstraint.transform.rotation = RigUtils.MyPlayer.headCollider.transform.rotation;
@@ -141,18 +140,9 @@ namespace MysticClient.Menu
                     }
                     else 
                     { 
-                        if (Ghost.gameObject != null) 
-                        { 
-                            Destroy(Ghost.gameObject); 
-                            Ghost = null; 
-                        }
-                        if (rightGhostHand != null || leftGhostHand != null)
-                        {
-                            Destroy(rightGhostHand);
-                            rightGhostHand = null;
-                            Destroy(leftGhostHand);
-                            leftGhostHand = null;
-                        }
+                        Ghost?.gameObject?.SetActive(false);
+                        rightGhostHand?.Destroy();
+                        leftGhostHand?.Destroy();
                     }
                 }
                 catch { }
@@ -166,49 +156,115 @@ namespace MysticClient.Menu
                 catch { }
                 try
                 {
-                    if (UserInput.GetMouseButton(0) && !Chainloader.PluginInfos.ContainsKey("org.thatguy.gorillatag.mysticguiex"))
+                    if (UserInput.GetMouseButton(0)) // so much shorter than what ever everyone else does
                     {
                         Physics.Raycast(mainCamera.ScreenPointToRay(UserInput.mousePosition), out var hit);
-                        GameObject.Find("Player Objects/Player VR Controller/GorillaPlayer/TurnParent/LeftHandTriggerCollider").transform.position = hit.point;
-                        GameObject.Find("Player Objects/Player VR Controller/GorillaPlayer/TurnParent/LeftHandTriggerCollider").GetComponent<TransformFollow>().enabled = false;
-                    } else GameObject.Find("Player Objects/Player VR Controller/GorillaPlayer/TurnParent/LeftHandTriggerCollider").GetComponent<TransformFollow>().enabled = true;
+                        GameObject.Find("LeftHandTriggerCollider").transform.position = hit.point;
+                        GameObject.Find("LeftHandTriggerCollider").GetComponent<TransformFollow>().enabled = false;
+                    } else GameObject.Find("LeftHandTriggerCollider").GetComponent<TransformFollow>().enabled = true;
                 }
                 catch { }
                 try
                 {
+                    var material = new Material(UberShader) { color = NormalColor };
                     GameObject.Find("CodeOfConduct").GetComponent<TMP_Text>().text = "<color=blue>Credits</color>";
-                    GameObject.Find("Environment Objects/LocalObjects_Prefab/TreeRoom/motd (1)").GetComponent<TMP_Text>().text = "<color=blue>Updates</color>";
-                    GameObject.Find("Environment Objects/LocalObjects_Prefab/TreeRoom/motdtext").GetComponent<TMP_Text>().text = MOTDText;
-                    GameObject.Find("Environment Objects/LocalObjects_Prefab/TreeRoom/COC Text").GetComponent<TMP_Text>().text = Credits;
-                    GameObject.Find("Environment Objects/LocalObjects_Prefab/TreeRoom/TreeRoomBoundaryStones/BoundaryStoneSet_Forest/wallmonitorforestbg").GetComponent<Renderer>().material.color = Color.black;
-                    GameObject.Find("Environment Objects/LocalObjects_Prefab/TreeRoom/TreeRoomInteractables/GorillaComputerObject/ComputerUI/monitor/monitorScreen").GetComponent<Renderer>().material.color = Color.black;
-                    GameObject.Find("Environment Objects/LocalObjects_Prefab/TreeRoom/TreeRoomInteractables/GorillaComputerObject/ComputerUI/monitor").GetComponent<Renderer>().material.color = Color.blue;
-                    GameObject.Find("Environment Objects/LocalObjects_Prefab/TreeRoom/TreeRoomInteractables/GorillaComputerObject/ComputerUI/keyboard (1)").GetComponent<Renderer>().material.color = Color.magenta;
+                    GameObject.Find("motd (1)").GetComponent<TMP_Text>().text = "<color=blue>Updates</color>";
+                    GameObject.Find("motdtext").GetComponent<TMP_Text>().text = MOTDText;
+                    GameObject.Find("COC Text").GetComponent<TMP_Text>().text = Credits;
+                    GameObject.Find("wallmonitorforestbg").ChangeMaterial(material);
+                    GameObject.Find("Environment Objects/LocalObjects_Prefab/TreeRoom/TreeRoomInteractables/GorillaComputerObject/ComputerUI/monitor/monitorScreen").ChangeMaterial(material);
+                    GameObject.Find("Environment Objects/LocalObjects_Prefab/TreeRoom/TreeRoomInteractables/GorillaComputerObject/ComputerUI/monitor").ChangeColor(outlineColor);
+                    GameObject.Find("Environment Objects/LocalObjects_Prefab/TreeRoom/TreeRoomInteractables/GorillaComputerObject/ComputerUI/keyboard (1)").ChangeColor(ButtonColorDisable);
                     int find = 0;
-                    for (int i = 0; i < GameObject.Find("Environment Objects/LocalObjects_Prefab/TreeRoom").transform.childCount; i++)
+                    if (!foundBoards)
                     {
-                        var boards = GameObject.Find("Environment Objects/LocalObjects_Prefab/TreeRoom").transform.GetChild(i).gameObject;
-                        if (boards.name.Contains("forestatlas"))
+                        for (int i = 0; i < GameObject.Find("Environment Objects/LocalObjects_Prefab/TreeRoom").transform.childCount; i++)
                         {
-                            find++;
-                            if (find == 2)
-                                boards.GetComponent<Renderer>().material.color = Color.black;
+                            var boards = GameObject.Find("Environment Objects/LocalObjects_Prefab/TreeRoom").transform.GetChild(i).gameObject;
+                            if (boards.name.Contains("UnityTempFile"))
+                            {
+                                find++;
+                                if (find == 2) // sigma code right here
+                                {
+                                    boardName = boards.name;
+                                    Debug.Log($"Found board name: {boards.name}");
+                                }
+                            }
+                        }
+                        foundBoards = true;
+                    }
+                    if (foundBoards)
+                    {
+                        find = 0;
+                        for (int i = 0; i < GameObject.Find("Environment Objects/LocalObjects_Prefab/TreeRoom").transform.childCount; i++)
+                        {
+                            var boards = GameObject.Find("Environment Objects/LocalObjects_Prefab/TreeRoom").transform.GetChild(i).gameObject;
+                            if (boards.name.Contains(boardName)) // 8e79918dcea7d684f8d517406813ed80 2/8/2025
+                            {
+                                find++;
+                                if (find == 2)
+                                    boards.ChangeMaterial(material);
+                            }
+                        }
+                        find = 0;
+                        for (int i = 0; i < GameObject.Find("Environment Objects/LocalObjects_Prefab/Forest").transform.childCount; i++)
+                        {
+                            var boards = GameObject.Find("Environment Objects/LocalObjects_Prefab/Forest").transform.GetChild(i).gameObject;
+                            if (boards.name.Contains(boardName))
+                            {
+                                find++;
+                                if (find == 4)
+                                    boards.ChangeMaterial(material);
+                            }
                         }
                     }
-                    find = 0;
-                    for (int i = 0; i < GameObject.Find("Environment Objects/LocalObjects_Prefab/Forest").transform.childCount; i++)
+                    for (int i = 0; i < GameObject.Find("Environment Objects").transform.childCount; i++)
                     {
-                        var boards = GameObject.Find("Environment Objects/LocalObjects_Prefab/Forest").transform.GetChild(i).gameObject;
-                        if (boards.name.Contains("forestatlas"))
+                        var boards = GameObject.Find("Environment Objects").transform.GetChild(i).gameObject;
+                        if (boards.name == "wallmonitorscreen_small(clone)")
+                            boards.ChangeMaterial(material);
+                    }
+                    /*find = 0;
+                    for (int i = 0; i < GameObject.Find("Environment Objects/LocalObjects_Prefab/City_WorkingPrefab").transform.childCount; i++)
+                    {
+                        var boards = GameObject.Find("Environment Objects/LocalObjects_Prefab/City_WorkingPrefab").transform.GetChild(i).gameObject;
+                        if (boards.name.Contains("db6d743600b8c3547ada9400d1affb93"))
                         {
                             find++;
-                            if (find == 2)
-                                boards.GetComponent<Renderer>().material.color = Color.black;
+                            if (find == 3)
+                                boards.ChangeMaterial(material);
+                        }
+                    }*/
+                    foreach (var buttons in GetKeyboardButtons())
+                    {
+                        var colorSetting = buttons.ButtonColorSettings;
+                        colorSetting.UnpressedColor = ButtonColorDisable;
+                        colorSetting.PressedColor = ButtonColorEnabled;
+                        gorillaKeys = buttons;
+                        if (!pressedKeys)
+                        {
+                            buttons.PressButtonColourUpdate();
+                            pressedKeys = true;
                         }
                     }
-                    foreach (var objs in GetGameObjects())
-                        if (objs.name == "Wallmonitor_Small_Prefab")
-                            objs.GetNamedChild("wallmonitorscreen_small").GetComponent<Renderer>().material.color = Color.black;
+                    if (!foundSmallBoards)
+                    {
+                        foreach (var objs in GetGameObjects())
+                            if (objs.name == "wallmonitorscreen_small")
+                            {
+                                var obj = Instantiate(objs, objs.transform);
+                                obj.ChangeMaterial(material);
+                                obj.transform.localScale = obj.transform.localScale + new Vector3(.001f, .001f, .001f);
+                                obj.transform.parent = GameObject.Find("Environment Objects").transform;
+                            }
+                        foundSmallBoards = true;
+                    }
+                    for (int i = 0; i < GameObject.Find("Environment Objects").transform.childCount; i++)
+                    {
+                        var board = GameObject.Find("Environment Objects").transform.GetChild(i).gameObject;
+                        if (board.name.Contains("wallmonitorscreen_small"))
+                            board.ChangeMaterial(material);
+                    }
                 } catch { }
                 try // loading and setting
                 {
@@ -225,8 +281,9 @@ namespace MysticClient.Menu
                     MCTextures[9] = (Texture2D)BundleObjects[0].GetNamedChild("Obsidian").GetComponent<Renderer>().material.mainTexture;
                     MCTextures[10] = (Texture2D)BundleObjects[0].GetNamedChild("Water").GetComponent<Renderer>().material.mainTexture;
                     MCTextures[11] = (Texture2D)BundleObjects[0].GetNamedChild("TrapDoor").GetComponent<Renderer>().material.mainTexture;
+                    Fun.car ??= BundleObjects[0].GetNamedChild("Cyber truck");
                     BundleObjects[0].transform.Rotate(0, .2f, 0); // idk im bored
-                    keyboard = BundleObjects[1];
+                    keyboard ??= BundleObjects[1];
                     Movement.platColorKeys[0].color = Movement.PlatFirstColor;
                     Movement.platColorKeys[0].time = 0f;
                     Movement.platColorKeys[1].color = Movement.PlatSecondColor;
@@ -255,95 +312,111 @@ namespace MysticClient.Menu
                         trail.minVertexDistance = .1f;
                     }
                     var radius = .8f; var speed = 90f; var tilt = 30f; planetRing.transform.position = planet.transform.position + new Vector3(Mathf.Cos(Time.frameCount / speed) * radius, Mathf.Sin(Time.frameCount / speed) * radius * Mathf.Sin(Mathf.Deg2Rad * tilt), Mathf.Sin(Time.frameCount / speed) * Mathf.Cos(Mathf.Deg2Rad * tilt) * radius);
-                    if (GetEnabled("Disable Stump Planet"))
-                    {
-                        planet.SetActive(false);
-                        planetRing.SetActive(false);
-                    }
-                    else
-                    {
-                        planet.SetActive(true);
-                        planetRing.SetActive(true);
-                    }
+                    if (GetEnabled("Disable Stump Planet")) { planet.SetActive(false); planetRing.SetActive(false); } else { planet.SetActive(true); planetRing.SetActive(true); }
+
                     //DateTimeTitle = DateTime.Now.ToString(); menuTitleZ = menuSize.z / 2f;
+                }
+                catch { }
+                try
+                {
+                    Fun.pickaxe ??= BundleObjects[0].GetNamedChild("Pickaxe");
+                    Fun.pickaxe.transform.localScale = new Vector3(.7f, .7f, .7f);
+                    if (GetEnabled("Pickaxe"))
+                    {
+                        Fun.pickaxe.transform.parent = RigUtils.MyOnlineRig.rightHandTransform;
+                        Fun.pickaxe.layer = 2;
+                        Fun.pickaxe.transform.localPosition = Vector3.zero;
+                        Fun.pickaxe.transform.localRotation = DevUI.pickRot;
+                        Fun.pickaxe.SetActive(true);
+                    } else Fun.pickaxe.SetActive(false);
                 } catch { }
             } 
             catch { }
-            try
+            if (inKeyboard)
             {
-                if (inKeyboard)
+                keyboard.SetActive(true);
+                if (!XRSettings.isDeviceActive)
                 {
-                    CreateKeyboardReference();
-                    if (menu == null)
+                    for (var letter = KeyCode.A; letter <= KeyCode.Z; letter++)
+                        if (UserInput.GetKeyDown(letter))
+                        {
+                            KeyboardInput += letter.ToString();
+                            RigUtils.MyOfflineRig.PlayHandTapLocal(66, GetEnabled("Right Hand Menu"), .4f);
+                            RecreateMenu();
+                        }
+
+                    if (UserInput.GetKeyDown(KeyCode.Backspace) && KeyboardInput.Length > 0)
                     {
-                        CreateMenu();
-                        menu.transform.position = RigUtils.MyOfflineRig.transform.forward;
-                        menu.transform.LookAt(RigUtils.MyOfflineRig.transform.position);
+                        try { KeyboardInput = KeyboardInput[..^1]; } catch { }
+                        RigUtils.MyOfflineRig.PlayHandTapLocal(66, GetEnabled("Right Hand Menu"), .4f);
+                        RecreateMenu();
                     }
-                    var distance = Vector3.Distance(menu.transform.position, RigUtils.MyOfflineRig.transform.position);
-                    if (distance > 5f)
+
+                    if (UserInput.GetKeyDown(KeyCode.Space))
                     {
-                        menu.transform.position = RigUtils.MyOfflineRig.transform.forward;
-                        menu.transform.LookAt(RigUtils.MyOfflineRig.transform.position);
+                        KeyboardInput += " ";
+                        RigUtils.MyOfflineRig.PlayHandTapLocal(66, GetEnabled("Right Hand Menu"), .4f);
+                        RecreateMenu();
                     }
-                    Settings.SetUpKeyboard();
-                    var foundMods = new List<ButtonInfo>();
-                    foreach (var btnss in buttons)
-                        foreach (var btns in btnss)
-                            foreach (var btn in btns)
-                                if (btn.buttonText.Contains(Settings.inputtext))
-                                    foundMods.Add(btn);
-                    var searchText = Settings.inputtext + ((Time.frameCount / 45 % 2) == 0 ? "|" : " ");
-                    var top = new ButtonInfo { buttonText = searchText, isTogglable = false };
-                    var btnArray = Settings.inputtext == "" ? foundMods.Skip(pageNumber * pageSize).Take(pageSize).ToArray() : buttons[easyPage][buttonsType].Skip(pageNumber * pageSize).Take(pageSize).ToArray();
-                    CreateButton(0, top);
-                    for (int i = 0; i < btnArray.Length; i++)
-                        CreateButton((i + 1) * internalButtonOffset, btnArray[i]);
-                }
+
+                    if (UserInput.GetKeyDown(KeyCode.Return))
+                    {
+                        RecreateMenu();
+                        RigUtils.MyOfflineRig.PlayHandTapLocal(66, GetEnabled("Right Hand Menu"), .4f);
+                    }
+
+                    if (UserInput.GetKeyDown(KeyCode.Escape))
+                    {
+                        RigUtils.MyOfflineRig.PlayHandTapLocal(66, GetEnabled("Right Hand Menu"), .4f);
+                        inKeyboard = false;
+                        RecreateMenu();
+                    }
+                } 
                 else
                 {
-                    GameObject.Find("buttonPresser_Right").Destroy();
-                    GameObject.Find("buttonPresser_Left").Destroy();
+                    Settings.ColorKeyboard(GetEnabled("Outline Menu"));
+                    Settings.SetUpKeyboard();
                 }
-            } catch { }
+                inputTextObject.text = KeyboardInput + ((Time.frameCount / 45 % 2) == 0 ? "|" : "");
+            } else keyboard.SetActive(false);
             try
             {
                 foreach (var btnss in buttons)
                     foreach (var btns in btnss)
                         foreach (var btn in btns)
                             if (btn.enabled)
+                            {
                                 if (btn.method != null)
-                                {
                                     try { btn.method.Invoke(); }
-                                    catch (Exception exc) { Debug.LogError(string.Format("{0} // Error with mod {1} at {2}: {3}", PluginInfo.Name, btn.buttonText, exc.StackTrace, exc.Message)); }
-                                }
-            } catch (Exception exc) { Debug.LogError(string.Format("{0} // Fatal Error {1} - {2}", PluginInfo.Name, exc.StackTrace, exc.Message)); }
+                                    catch (Exception exc) { Debug.LogError($"{PluginInfo.Name} // Error with mod {btn.buttonText} at {exc.StackTrace}: {exc.Message}"); }
+                            }
+            } catch (Exception exc) { Debug.LogError($"<b>{PluginInfo.Name} | Fatal Error<b> at {exc.StackTrace} - {exc.Message}"); }
         }
 
         public static AudioClip[] AudioClips = new AudioClip[999];
-        public static Texture2D[] Textures = new Texture2D[999];
+        public static Texture2D[] LinkTextures = new Texture2D[999];
+        public static Texture2D[] PathTextures = new Texture2D[999];
         public static GameObject[] BundleObjects = new GameObject[999];
         public static Texture2D[] MCTextures = new Texture2D[999];
         private static void Load()
         {
-            for (int i = 0; i < Stringys[0].Length; i++)
+            if (!fastLoad)
             {
-                if (AudioClips[i] == null)
-                    AudioClips[i] = Loaders.GetAudioFromURL(Stringys[0][i]);
-            }
-            for (int i = 0; i < Stringys[1].Length; i++)
-            {
-                if (Textures[i] == null)
-                    Textures[i] = Loaders.LoadImageFromURL(Stringys[1][i]);
+                for (int i = 0; i < Stringys[0].Length; i++)
+                    AudioClips[i] ??= Loaders.GetAudioFromURL(Stringys[0][i]);
+                for (int i = 0; i < Stringys[1].Length; i++)
+                    LinkTextures[i] ??= Loaders.LoadImageFromURL(Stringys[1][i]);
             }
             for (int i = 0; i < Stringys[2].Length; i++)
-            {
-                if (BundleObjects[i] == null)
-                    BundleObjects[i] = Loaders.LoadGameObject(Stringys[2][i].Split(':')[0], Stringys[2][i].Split(':')[1]);
-            }
+                BundleObjects[i] ??= Loaders.LoadGameObject(Stringys[2][i].Split(':')[0], Stringys[2][i].Split(':')[1]);
+            for (int i = 0; i < Stringys[3].Length; i++)
+                PathTextures[i] ??= Loaders.LoadTexture(Stringys[3][i]);
+
+            /*for (int i = 0; i < Stringys[4].Length; i++) well it was a good try and i dont think a menu being 84mb would look good anyway
+                AudioClips[i] ??= Loaders.GetAudioClip(Stringys[4][i]);*/
         }
 
-        private static string[][] Stringys =
+        public static string[][] Stringys =
         {
             new string[] // audio links 0
             {
@@ -371,6 +444,9 @@ namespace MysticClient.Menu
                 "https://drive.google.com/uc?export=download&id=1YjJAyh2tYWzbdc1H7OBBq6dC2_4wJ6ym", // haggstorm 21
                 "https://drive.google.com/uc?export=download&id=19sSkt2lR66Bp5gNfMxJ4MfPCGClIzuLU", // pigstep 22
                 "https://drive.google.com/uc?export=download&id=1QzM51uwVEvWTunn8ZIPfLRhq5OlYTP7r", // pigstep (alan becker) 23
+                "https://drive.google.com/uc?export=download&id=1-mKtFaEvtTDHOwhTIh8gsjQOkFSlJkvr", // minecraft block break 24
+                "https://drive.google.com/uc?export=download&id=1HDEsDEUTgbpjxZJQZmJayxDTBVln-r7D", // minecraft block hit 25
+                "https://drive.google.com/uc?export=download&id=1hRZMcsqMtvo-lpgoO7SSytLRISUUcLiW", // moon 2 (minecraft remake) 26
             },
             // fix paypal temp stuff (if i dont fix this and you see this on my github this is for a template that my friend made)
             new string[] // texture links 1
@@ -380,27 +456,58 @@ namespace MysticClient.Menu
             },
             new string[] // asset bundle paths 2
             {
-                //"MysticClient.Resources.adminplumbob:Admin Plumbob", //plumbob 0
+                //"MysticClient.Resources.adminplumbob:Admin Plumbob", // plumbob 0
                 //"MysticClient.Resources.adminplanet:Planet", // planet 1
-                "MysticClient.Resources.mcbundle:TextureBundle", // minecraft texture bundle 0
+                "MysticClient.Resources.menubundle:MenuBundle", // minecraft texture bundle 0
+                //"MysticClient.Resources.audioobjects:AudioObjects", menu audios 1
                 "MysticClient.Resources.keyboard:Keyboard", // vr keyboard 1
-            }
+                "MysticClient.Resources.modmanager:ModManager", // mod manager object 2
+            },
+            new string[] // menu image paths :3
+            {
+                "MysticClient.Resources.SettingIcon.png", // setting icon 0
+                "MysticClient.Resources.WarningIcon.png", // warning icon 1
+                "MysticClient.Resources.Search.png", // search icon 2
+                "MysticClient.Resources.HomeIcon.png", // home icon 3
+            },
+            new string[] // audio object names 4
+            {
+                "ButtonEnable",
+                "ButtonDisable",
+                "MenuOpen",
+                "MenuClose",
+                "Notifications",
+                "PageButton",
+                "Error",
+                "CommandOn",
+                "CommandOff",
+                "Living Mice",
+                "Clark",
+                "Danny",
+                "Oxygene",
+                "Key",
+                "Droopy",
+                "Moog City",
+                "Moog City 2",
+                "Subwoofer Lullaby",
+                "Dog",
+                "Cat",
+                "Aria Math",
+                "Haggstorm",
+                "Pigstep (Stereo Mix)",
+                "PigStep (feat. Aaron Grooves)",
+                "MCBlockBreak",
+                "MCBlockHit",
+                "Moon2",
+            },
         };
         public static void CreateMenu()
         {
-            if (physicSetting == 0 || physicSetting == 1) // i know i can simplify this but im too lazy
-            {
-                menu = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                Destroy(menu.GetComponent<Rigidbody>());
+            menu = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            Destroy(menu.GetComponent<Rigidbody>());
+            Destroy(menu.GetComponent<Renderer>());
+            if (physicSetting != 2)
                 Destroy(menu.GetComponent<BoxCollider>());
-                Destroy(menu.GetComponent<Renderer>());
-            }
-            else if (physicSetting == 2)
-            {
-                menu = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                Destroy(menu.GetComponent<Rigidbody>());
-                Destroy(menu.GetComponent<Renderer>());
-            }
             menu.name = "MysticClientModMenu";
             menu.layer = 8;
             menu.transform.localScale = GetEnabled("Annoying Menu") ? new Vector3(.1f, Random.Range(.3f, .5f), parentSize.z) : parentSize;
@@ -410,40 +517,19 @@ namespace MysticClient.Menu
             menuBackground.transform.parent = menu.transform;
             menuBackground.transform.rotation = Quaternion.identity;
             menuBackground.transform.localScale = GetEnabled("Annoying Menu") ? new Vector3(Random.Range(.1f, .3f), Random.Range(1f, 5f), Random.Range(1f, 5f)) : menuSize;
-            /*if (GetEnabled("Make Menu Flash"))
-            {
-                MenuColorKeys[0].color = FirstColor;
-                MenuColorKeys[0].time = 0f;
-                MenuColorKeys[1].color = SecondColor;
-                MenuColorKeys[1].time = 0.3f;
-                MenuColorKeys[2].color = FirstColor;
-                MenuColorKeys[2].time = 0.6f;
-                MenuColorKeys[3].color = SecondColor;
-                MenuColorKeys[3].time = 1f;
-                ColorChanger colorChanger = menuBackground.AddComponent<ColorChanger>();
-                colorChanger.colors = new Gradient
-                {
-                    colorKeys = MenuColorKeys
-                };
-                colorChanger.loop = true;
-            }
-            else
-            {
-                menuBackground.GetComponent<Renderer>().material.color = NormalColor;
-            }*/
-            menuBackground.GetComponent<Renderer>().material.color = NormalColor;
+            menuBackground.GetComponent<Renderer>().material = GetEnabled("Semi-Transparent Menu") ? TransparentMaterial(GetChangeColorA(NormalColor, .3f)) : NormalMaterial(NormalColor);
             menuBackground.transform.position = menuPos;
-            if (GetEnabled("Outline Menu"))
-                OutlineMenuObject(menuBackground);
+            if (GetEnabled("Outline Menu")) OutlineMenuObject(menuBackground);
             if (GetEnabled("Menu Trail"))
             {
                 var trail = menu.AddComponent<TrailRenderer>();
-                trail.material = TransparentMaterial(GetChangeColorA(GetEnabled("Make Menu Trail Color Follow Menu Color") ? NormalColor : menuTrailColor, .8f));
+                trail.material = TransparentMaterial(GetChangeColorA(GetEnabled("Make Menu Trail Color Follow Menu Color") ? NormalColor : menuTrailColor, GetEnabled("Semi-Transparent Menu") ? .5f : .8f));
                 trail.time = .3f;
                 trail.startWidth = .03f;
                 trail.endWidth = 0;
                 trail.minVertexDistance = .1f;
             }
+            if (GetEnabled("Round Menu")) RoundMenuObject(menuBackground);
             canvasObject = new GameObject();
             canvasObject.transform.parent = menu.transform;
             var canvas = canvasObject.AddComponent<Canvas>();
@@ -459,7 +545,7 @@ namespace MysticClient.Menu
                 }
             }.AddComponent<Text>();
             text.font = currentFont;
-            text.text = menuTitle;
+            text.text = GetEnabled("Annoying Menu") ? DzongkhaMenuName : menuTitle;
             text.fontSize = 1;
             text.supportRichText = true;
             text.fontStyle = titleFontStyle;
@@ -468,298 +554,80 @@ namespace MysticClient.Menu
             text.resizeTextMinSize = 0;
             var component = text.GetComponent<RectTransform>();
             component.localPosition = Vector3.zero;
-            component.sizeDelta = new Vector2(0.28f, 0.05f);
+            component.sizeDelta = menuTitleSize;
             component.position = new Vector3(0.06f, 0f, menuTitleZ);
             component.rotation = Quaternion.Euler(new Vector3(180f, 90f, 90f));
-            /*if (GetEnabled("Date Time"))
-            {
-                Text datetimetext = new GameObject
-                {
-                    transform =
-                    {
-                        parent = canvasObject.transform
-                    }
-                }.AddComponent<Text>();
-                datetimetext.text = DateTimeTitle;
-                datetimetext.font = currentFont;
-                datetimetext.fontSize = 2;
-                datetimetext.alignment = TextAnchor.MiddleCenter;
-                datetimetext.fontStyle = FontStyle.BoldAndItalic;
-                datetimetext.resizeTextForBestFit = true;
-                datetimetext.resizeTextMinSize = 0;
-                RectTransform dateRect = datetimetext.GetComponent<RectTransform>();
-                dateRect.localPosition = Vector3.zero;
-                dateRect.sizeDelta = new Vector2(0.28f, 0.05f);
-                dateRect.position = new Vector3(0.06f, 0f, dateTimeZ);
-                dateRect.rotation = Quaternion.Euler(new Vector3(180f, 90f, 90f));
-            }*/
             if (GetEnabled("Side Disconnect"))
             {
-                var disconnectbutton = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                Destroy(disconnectbutton.GetComponent<Rigidbody>());
-                disconnectbutton.GetComponent<BoxCollider>().isTrigger = true;
-                disconnectbutton.transform.parent = menu.transform;
-                disconnectbutton.transform.rotation = Quaternion.identity;
-                disconnectbutton.transform.localScale = disconnectSize;
-                disconnectbutton.transform.localPosition = disconnectPos;
-                if (GetEnabled("Outline Menu"))
-                    OutlineMenuObject(disconnectbutton);
-                disconnectbutton.AddComponent<BtnCollider>().relatedText = "DisconnectingButton";
-                /*if (GetEnabled("Make Menu Flash"))
-                {
-                    ColorChanger colorChanger = disconnectbutton.AddComponent<ColorChanger>();
-                    colorChanger.colors = new Gradient
-                    {
-                        colorKeys = MenuColorKeys
-                    };
-                    colorChanger.loop = true;
-                }
-                else*/
-                disconnectbutton.GetComponent<Renderer>().material.color = NormalColor;
-                Text discontext = new GameObject
-                {
-                    transform =
-                    {
-                        parent = canvasObject.transform
-                    }
-                }.AddComponent<Text>();
-                discontext.text = "Disconnect";
-                discontext.font = currentFont;
-                discontext.fontSize = 2;
-                discontext.alignment = TextAnchor.MiddleCenter;
-                discontext.fontStyle = FontStyle.BoldAndItalic;
-                discontext.resizeTextForBestFit = true;
-                discontext.resizeTextMinSize = 0;
-
-                RectTransform rectt = discontext.GetComponent<RectTransform>();
-                rectt.localPosition = Vector3.zero;
-                rectt.sizeDelta = new Vector2(0.1f, 0.03f);
-                rectt.localPosition = disconnectbutton.transform.position + new Vector3(.01f, 0, 0);
-                rectt.rotation = Quaternion.Euler(new Vector3(180f, 90f, 90f));
+                var matr = GetEnabled("Semi-Transparent Menu") ? TransparentMaterial(GetChangeColorA(NormalColor, .3f)) : NormalMaterial(NormalColor);
+                CreateButton("Disconnect", "DisconnectingButton", disconnectPos, disconnectSize, sideTextSize, matr);
             }
-
             if (GetEnabled("Destroy Networked Objects Side Button"))
             {
-                var destoryButton = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                Destroy(destoryButton.GetComponent<Rigidbody>());
-                destoryButton.GetComponent<BoxCollider>().isTrigger = true;
-                destoryButton.transform.parent = menu.transform;
-                destoryButton.transform.rotation = Quaternion.identity;
-                destoryButton.transform.localScale = disconnectSize;
-                destoryButton.transform.localPosition = disconnectPos + new Vector3(0, 0, .15f);
-                if (GetEnabled("Outline Menu"))
-                    OutlineMenuObject(destoryButton);
-                destoryButton.AddComponent<BtnCollider>().relatedText = "DestroyButton";
-                /*if (GetEnabled("Make Menu Flash"))
-                {
-                    ColorChanger colorChanger = destoryButton.AddComponent<ColorChanger>();
-                    colorChanger.colors = new Gradient
-                    {
-                        colorKeys = MenuColorKeys
-                    };
-                    colorChanger.loop = true;
-                }
-                else*/
-                destoryButton.GetComponent<Renderer>().material.color = NormalColor;
-                Text destroytext = new GameObject
-                {
-                    transform =
-                        {
-                            parent = canvasObject.transform
-                        }
-                }.AddComponent<Text>();
-                destroytext.text = "Destory Networked Objects";
-                destroytext.font = currentFont;
-                destroytext.fontSize = 2;
-                destroytext.alignment = TextAnchor.MiddleCenter;
-                destroytext.fontStyle = FontStyle.BoldAndItalic;
-                destroytext.resizeTextForBestFit = true;
-                destroytext.resizeTextMinSize = 0;
-
-                RectTransform recttt = destroytext.GetComponent<RectTransform>();
-                recttt.localPosition = Vector3.zero;
-                recttt.sizeDelta = new Vector2(0.1f, 0.03f);
-                recttt.localPosition = destoryButton.transform.position + new Vector3(.01f, 0, 0); // new Vector3(0.071f, -.331f, 0.12f)
-                recttt.rotation = Quaternion.Euler(new Vector3(180f, 90f, 90f));
+                var matr = GetEnabled("Semi-Transparent Menu") ? TransparentMaterial(GetChangeColorA(NormalColor, .3f)) : NormalMaterial(NormalColor);
+                CreateButton("Destroy Networked Objects", "DestroyButton", disconnectPos + new Vector3(0, 0, .18f), disconnectSize, sideTextSize, matr);
             }
             if (GetToolTip("Changed Menu Theme").buttonText.Contains("AZ"))
             {
-                var roominfo = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                Destroy(roominfo.GetComponent<Rigidbody>());
-                Destroy(roominfo.GetComponent<BoxCollider>());
-                roominfo.transform.parent = menu.transform;
-                roominfo.transform.rotation = Quaternion.identity;
-                roominfo.transform.localScale = new Vector3(.09f, .9f, .25f);
-                roominfo.transform.localPosition = new Vector3(.56f, 0, -.7f);
-                roominfo.GetComponent<Renderer>().material.color = Color.black;
-                Text infotext = new GameObject
-                {
-                    transform =
-                        {
-                            parent = canvasObject.transform
-                        }
-                }.AddComponent<Text>();
-                if (PhotonSystem.InRoom)
-                    infotext.text = "Players in room: " + PhotonSystem.RoomPlayerCount + "\nRoom Name: " + PhotonSystem.RoomName;
-                else
-                    infotext.text = "<color=red>NOT IN ROOM</color>";
-                infotext.font = currentFont;
-                infotext.fontSize = 2;
-                infotext.alignment = TextAnchor.MiddleCenter;
-                infotext.fontStyle = FontStyle.BoldAndItalic;
-                infotext.resizeTextForBestFit = true;
-                infotext.resizeTextMinSize = 0;
-
-                RectTransform recttt = infotext.GetComponent<RectTransform>();
-                recttt.localPosition = Vector3.zero;
-                recttt.sizeDelta = new Vector2(0.2f, 0.05f);
-                recttt.localPosition = roominfo.transform.position + new Vector3(.01f, 0, 0);
-                recttt.rotation = Quaternion.Euler(new Vector3(180f, 90f, 90f));
+                var txt = PhotonSystem.InRoom ? $"Players in room: {PhotonSystem.RoomPlayerCount}\nRoom Name: {PhotonSystem.RoomName}" : "<color=red>NOT IN ROOM</color>";
+                var mat = GetEnabled("Semi-Transparent Menu") ? TransparentMaterial(GetChangeColorA(Color.black, .3f)) : NormalMaterial(Color.black);
+                CreateButton(txt, "", new Vector3(.56f, 0f, -.7f), new Vector3(.09f, .9f, .25f), sideTextSize, mat, false);
                 if (!GetEnabled("Side Disconnect"))
                 {
-                    var disconnectbutton = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    Destroy(disconnectbutton.GetComponent<Rigidbody>());
-                    disconnectbutton.GetComponent<BoxCollider>().isTrigger = true;
-                    disconnectbutton.transform.parent = menu.transform;
-                    disconnectbutton.transform.rotation = Quaternion.identity;
-                    disconnectbutton.transform.localScale = new Vector3(0.045f, 0.9f, 0.17f);
-                    disconnectbutton.transform.localPosition = new Vector3(0.56f, 0f, .53f);
-                    disconnectbutton.AddComponent<BtnCollider>().relatedText = "DisconnectingButton";
-                    disconnectbutton.GetComponent<Renderer>().material.color = Color.black;
-                    if (GetEnabled("Outline Menu"))
-                        OutlineMenuObject(disconnectbutton);
-                    Text discontext = new GameObject
-                    {
-                        transform =
-                    {
-                        parent = canvasObject.transform
-                    }
-                    }.AddComponent<Text>();
-                    discontext.text = "Disconnect";
-                    discontext.font = currentFont;
-                    discontext.fontSize = 1;
-                    discontext.alignment = TextAnchor.MiddleCenter;
-                    discontext.fontStyle = FontStyle.BoldAndItalic;
-                    discontext.resizeTextForBestFit = true;
-                    discontext.resizeTextMinSize = 0;
-
-                    var rectt = discontext.GetComponent<RectTransform>();
-                    rectt.localPosition = Vector3.zero;
-                    rectt.sizeDelta = new Vector2(0.2f, 0.03f);
-                    rectt.localPosition = new Vector3(0.064f, 0f, 0.21f);
-                    rectt.rotation = Quaternion.Euler(new Vector3(180f, 90f, 90f));
+                    var mater = GetEnabled("Semi-Transparent Menu") ? TransparentMaterial(GetChangeColorA(Color.black, .3f)) : NormalMaterial(Color.black);
+                    CreateButton("Disconnect", "DisconnectingButton", new Vector3(.56f, 0, .53f), new Vector3(.045f, .9f, .17f), sideTextSize, mater);
                 }
             }
-
-            if (GetToolTip("Changed Menu Theme").buttonText.Contains("PayPal"))
+            if (GetEnabled("Return Button"))
             {
-                /*var rend = menuBackground.GetComponent<Renderer>();
-                rend.material.shader = UniversalShader;
-                rend.material.color = new Color32(10, 164, 192, byte.MaxValue);
-                rend.material.mainTexture = Textures[0];
-                var obj = new GameObject { transform = { parent = canvasObject.transform } };
-                var image = obj.AddComponent<RawImage>();
-                image.texture = Textures[1];
-                var rect = obj.GetComponent<RectTransform>();
-                rect.sizeDelta = new Vector2(.3f, .2f);
-                rect.localPosition = new Vector3(.06f, 0, .29f);
-                rect.rotation = Quaternion.Euler(new Vector3(180f, 90f, 90f));*/
+                var a = GetToolTip("Changed Menu Theme").buttonText.Contains("NXO");
+                var btn = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                btn.Destroy<Rigidbody>();
+                if (!UserInput.GetKey(KeyCode.Q)) btn.layer = GetEnabled("No Button Colliders") ? 2 : 0;
+                btn.GetComponent<BoxCollider>().isTrigger = true;
+                btn.transform.parent = menu.transform;
+                btn.transform.rotation = Quaternion.identity;
+                btn.transform.localScale = a ? new Vector3(.045f, .30625f, .08f) : new Vector3(.09f, .102f, .08f);
+                btn.transform.localPosition = a ? new Vector3(.505f, 0, -.31f) : new Vector3(.56f, search.x + returnAddAmount.x, search.y + returnAddAmount.y);
+                btn.AddComponent<BtnCollider>().relatedText = "Return";
+                btn.ChangeMaterial(GetEnabled("Semi-Transparent Menu") ? TransparentMaterial(GetChangeColorA(NormalColor, .3f)) : NormalMaterial(NormalColor));
+                if (GetEnabled("Outline Menu")) OutlineMenuObject(btn);
+                if (GetEnabled("Round Menu")) RoundMenuObject(btn);
+                ImageMenuButton(btn, PathTextures[3]);
+
+                //var mat = GetEnabled("Semi-Transparent Menu") ? TransparentMaterial(GetChangeColorA(NormalColor, .3f)) : NormalMaterial(NormalColor);
+                //CreateButton("Return", "Return", new Vector3(.505f, 0, -.31f), new Vector3(.045f, .30625f, .08f), menuTextSize, mat);
             }
+
+            var button = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            button.Destroy<Rigidbody>();
+            if (!UserInput.GetKey(KeyCode.Q)) button.layer = GetEnabled("No Button Colliders") ? 2 : 0;
+            button.GetComponent<BoxCollider>().isTrigger = true;
+            button.transform.parent = menu.transform;
+            button.transform.rotation = Quaternion.identity;
+            button.transform.localScale = new Vector3(.09f, .102f, .08f);
+            button.transform.localPosition = new Vector3(.56f, search.x, search.y);
+            button.AddComponent<BtnCollider>().relatedText = "Search";
+            button.ChangeMaterial(GetEnabled("Semi-Transparent Menu") ? TransparentMaterial(GetChangeColorA(NormalColor, .3f)) : NormalMaterial(NormalColor));
+            if (GetEnabled("Outline Menu")) OutlineMenuObject(button);
+            if (GetEnabled("Round Menu")) RoundMenuObject(button);
+            ImageMenuButton(button, PathTextures[2]);
+
 
             int lastPage = ((buttons[easyPage][buttonsType].Length + pageSize - 1) / pageSize) - 1;
             int next = pageNumber + 1; int last = pageNumber - 1;
             if (next > lastPage) next = 0; if (last < 0) last = lastPage;
-            GameObject gameObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            Destroy(gameObject.GetComponent<Rigidbody>());
-            gameObject.GetComponent<BoxCollider>().isTrigger = true;
-            gameObject.transform.parent = menu.transform;
-            gameObject.transform.rotation = Quaternion.identity;
-            gameObject.transform.localScale = pageButtonSize;
-            gameObject.transform.localPosition = pagePoss[0];
-            if (GetEnabled("Outline Menu"))
-                OutlineMenuObject(gameObject);
-            /*if (GetEnabled("Make Menu Flash") && !GetToolTip("Changed Menu Type").buttonText.Contains("AZ"))
-            {
-                ColorChanger colorChanger = gameObject.AddComponent<ColorChanger>();
-                colorChanger.colors = new Gradient
-                {
-                    colorKeys = MenuColorKeys
-                };
-                colorChanger.loop = true;
-            }
-            else
-            {
-                gameObject.GetComponent<Renderer>().material.color = GetToolTip("Changed Menu Type").buttonText.Contains("AZ") ? Color.black : NormalColor;
-            }*/
-            gameObject.GetComponent<Renderer>().material.color = GetToolTip("Changed Menu Theme").buttonText.Contains("AZ") ? Color.black : NormalColor;
-            gameObject.AddComponent<BtnCollider>().relatedText = "PreviousPage";
-            text = new GameObject
-            {
-                transform =
-                {
-                    parent = canvasObject.transform
-                }
-            }.AddComponent<Text>();
+            var pageColor = GetToolTip("Changed Menu Theme").buttonText.Contains("AZ") ? Color.black : NormalColor;
+            var pageMat = GetEnabled("Semi-Transparent Menu") ? TransparentMaterial(GetChangeColorA(pageColor, .3f)) : NormalMaterial(pageColor);
             var usingTheme = GetToolTip("Changed Menu Theme").buttonText.Contains("Mango");
-            text.text = usingTheme ? $"[{last}] << Prev" : lastPageText;
-            text.font = currentFont;
-            text.fontSize = 1;
-            text.alignment = TextAnchor.MiddleCenter;
-            text.resizeTextForBestFit = true;
-            text.resizeTextMinSize = 0;
-            component = text.GetComponent<RectTransform>();
-            component.localPosition = Vector3.zero;
-            component.sizeDelta = new Vector2(0.2f, 0.03f);
-            component.localPosition = gameObject.transform.position + new Vector3(.01f, 0, 0); ;
-            component.rotation = Quaternion.Euler(new Vector3(180f, 90f, 90f));
-            gameObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            Destroy(gameObject.GetComponent<Rigidbody>());
-            gameObject.GetComponent<BoxCollider>().isTrigger = true;
-            gameObject.transform.parent = menu.transform;
-            gameObject.transform.rotation = Quaternion.identity;
-            gameObject.transform.localScale = pageButtonSize;
-            gameObject.transform.localPosition = pagePoss[1];
-            if (GetEnabled("Outline Menu"))
-                OutlineMenuObject(gameObject);
-            /*if (GetEnabled("Make Menu Flash") && !GetToolTip("Changed Menu Type").buttonText.Contains("AZ"))
-            {
-                ColorChanger colorChanger = gameObject.AddComponent<ColorChanger>();
-                colorChanger.colors = new Gradient
-                {
-                    colorKeys = MenuColorKeys
-                };
-                colorChanger.loop = true;
-            }
-            else
-            {
-                gameObject.GetComponent<Renderer>().material.color = GetToolTip("Changed Menu Type").buttonText.Contains("AZ") ? Color.black : NormalColor;
-            }*/
-            gameObject.GetComponent<Renderer>().material.color = GetToolTip("Changed Menu Theme").buttonText.Contains("AZ") ? Color.black : NormalColor;
-            gameObject.AddComponent<BtnCollider>().relatedText = "NextPage";
-            text = new GameObject
-            {
-                transform =
-                {
-                    parent = canvasObject.transform
-                }
-            }.AddComponent<Text>();
-            text.text = usingTheme ? $"Next >> [{next}]" : nextPageText;
-            text.font = currentFont;
-            text.fontSize = 1;
-            text.alignment = TextAnchor.MiddleCenter;
-            text.resizeTextForBestFit = true;
-            text.resizeTextMinSize = 0;
-            component = text.GetComponent<RectTransform>();
-            component.localPosition = Vector3.zero;
-            component.sizeDelta = new Vector2(0.2f, 0.03f);
-            component.localPosition = gameObject.transform.position + new Vector3(.01f, 0, 0);
-            component.rotation = Quaternion.Euler(new Vector3(180f, 90f, 90f));
+            CreateButton(usingTheme ? $"[{last}] << Prev" : lastPageText, "PreviousPage", pagePoss[0], pageButtonSize, menuTextSize, pageMat);
+            CreateButton(usingTheme ? $"Next >> [{next}]" : nextPageText, "NextPage", pagePoss[1], pageButtonSize, menuTextSize, pageMat);
+
             var tooltipObj = new GameObject();
             tooltipObj.transform.SetParent(canvasObject.transform);
-            tooltipObj.transform.localPosition = new Vector3(0f, 0f, 1.2f);
+            tooltipObj.transform.localPosition = new Vector3(0, 0, 1.2f);
             tooltipText = tooltipObj.GetComponent<Text>();
-            if (tooltipText == null)
-                tooltipText = tooltipObj.AddComponent<Text>();
+            if (tooltipText == null) tooltipText = tooltipObj.AddComponent<Text>();
             tooltipText.font = currentFont;
             tooltipText.text = tooltipString;
             tooltipText.fontSize = 18;
@@ -769,28 +637,145 @@ namespace MysticClient.Menu
             tooltipText.color = Color.white;
             var componenttooltip = tooltipObj.GetComponent<RectTransform>();
             componenttooltip.localPosition = Vector3.zero;
-            componenttooltip.sizeDelta = new Vector2(0.2f, 0.03f);
-            componenttooltip.position = new Vector3(0.06f, 0f, toolTipZ);
-            componenttooltip.rotation = Quaternion.Euler(new Vector3(180f, 90f, 90f));
+            componenttooltip.sizeDelta = menuTextSize;
+            componenttooltip.position = new Vector3(.06f, 0, toolTipZ);
+            componenttooltip.rotation = Quaternion.Euler(new Vector3(180, 90, 90));
             var activeButtons = buttons[easyPage][buttonsType].Skip(pageNumber * pageSize).Take(pageSize).ToArray();
-            if (!inKeyboard)
-                for (int i = 0; i < activeButtons.Length; i++)
-                    CreateButton(i * internalButtonOffset, activeButtons[i]);
+            for (int i = 0; i < activeButtons.Length; i++)
+                if (!inKeyboard)
+                    CreateModButton(i * internalButtonOffset + internalButtonAddOffset, activeButtons[i]);
+
+            if (inKeyboard)
+            {
+                var gameObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                gameObject.Destroy<Rigidbody>();
+                if (!UserInput.GetKey(KeyCode.Q)) gameObject.layer = GetEnabled("No Button Colliders") ? 2 : 0;
+                gameObject.GetComponent<BoxCollider>().isTrigger = true;
+                gameObject.transform.parent = menu.transform;
+                gameObject.transform.rotation = Quaternion.identity;
+                gameObject.transform.localScale = GetEnabled("Annoying Menu") ? new Vector3(.09f, Random.Range(1f, 5f), Random.Range(.08f, .1f)) : buttonSize;
+                gameObject.transform.localPosition = new Vector3(buttonPos.x, buttonPos.y, buttonPos.z);
+                if (GetEnabled("Outline Menu")) OutlineMenuObject(gameObject);
+                if (GetEnabled("Round Menu")) RoundMenuObject(gameObject);
+                inputTextObject = new GameObject
+                {
+                    transform =
+                    {
+                        parent = canvasObject.transform
+                    }
+                }.AddComponent<Text>();
+                inputTextObject.font = currentFont;
+                inputTextObject.color = buttonTextColor;
+                inputTextObject.supportRichText = true;
+                inputTextObject.fontSize = 1;
+                gameObject.GetComponent<Renderer>().material = GetEnabled("Semi-Transparent Menu") ? TransparentMaterial(GetChangeColorA(NormalColor, .3f)) : NormalMaterial(NormalColor);
+                inputTextObject.alignment = TextAnchor.MiddleCenter;
+                inputTextObject.fontStyle = buttonFontStyle;
+                inputTextObject.resizeTextForBestFit = true;
+                inputTextObject.resizeTextMinSize = 0;
+                var componentino = inputTextObject.GetComponent<RectTransform>();
+                componentino.sizeDelta = menuTextSize;
+                componentino.localPosition = gameObject.transform.position + new Vector3(GetEnabled("Semi-Transparent Menu") ? .02f : .01f, 0, 0);
+                componentino.rotation = Quaternion.Euler(new Vector3(180, 90, 90));
+            }
+
+            var searchedMods = new List<ButtonInfo> { };
+            if (inKeyboard)
+            foreach (var btnss in buttons)
+                foreach (var btns in btnss)
+                    foreach (var btn in btns)
+                    {
+                        try
+                        {
+                            if (btn.buttonText.ToLower().Contains(KeyboardInput.ToLower()))
+                                searchedMods.Add(btn);
+                        } catch { }
+                    }
+            var foundButtons = searchedMods.Skip(pageNumber * (pageSize - 1)).Take(pageSize - 1).ToArray();
+            if (inKeyboard) for (int i = 0; i < foundButtons.Length; i++)
+                    CreateModButton((i + 1) * internalButtonOffset + internalButtonAddOffset, foundButtons[i]);
         }
 
-        public static void CreateButton(float offset, ButtonInfo method)
+        public static void CreateButton(string buttonText, string relatedText, Vector3 position, Vector3 scale, Vector2 textSize, Material material, bool hasCollider = true)
+        {
+            var button = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            button.Destroy<Rigidbody>();
+            if (!UserInput.GetKey(KeyCode.Q)) button.layer = GetEnabled("No Button Colliders") ? 2 : 0;
+            if (!hasCollider) button.Destroy<Collider>();
+            if (hasCollider) button.GetComponent<BoxCollider>().isTrigger = true;
+            button.transform.parent = menu.transform;
+            button.transform.rotation = Quaternion.identity;
+            button.transform.localScale = scale;
+            button.transform.localPosition = position;
+            if (hasCollider) button.AddComponent<BtnCollider>().relatedText = relatedText;
+            button.GetComponent<Renderer>().material = GetEnabled("Semi-Transparent Menu") ? TransparentMaterial(GetChangeColorA(NormalColor, .3f)) : NormalMaterial(NormalColor);
+            if (GetEnabled("Outline Menu")) OutlineMenuObject(button);
+            if (GetEnabled("Round Menu")) RoundMenuObject(button);
+            var text = new GameObject
+            {
+                transform =
+                {
+                    parent = canvasObject.transform
+                }
+            }.AddComponent<Text>();
+            text.text = buttonText;
+            text.font = currentFont;
+            text.fontSize = 1;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.fontStyle = FontStyle.BoldAndItalic;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 0;
+            var rect = text.GetComponent<RectTransform>();
+            rect.sizeDelta = textSize;
+            rect.localPosition = button.transform.position + new Vector3(.01f, 0, 0);
+            rect.rotation = Quaternion.Euler(new Vector3(180, 90, 90));
+        }
+
+        public static void CreateModButton(float offset, ButtonInfo method)
         {
             var gameObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            Destroy(gameObject.GetComponent<Rigidbody>());
+            gameObject.Destroy<Rigidbody>();
+            if (!UserInput.GetKey(KeyCode.Q)) gameObject.layer = GetEnabled("No Button Colliders") ? 2 : 0;
             gameObject.GetComponent<BoxCollider>().isTrigger = true;
             gameObject.transform.parent = menu.transform;
             gameObject.transform.rotation = Quaternion.identity;
-            gameObject.transform.localScale = GetEnabled("Annoying Menu") ? new Vector3(.09f, Random.Range(1f, 5f), Random.Range(.08f, .1f)) : buttonSize;
-            gameObject.transform.localPosition = new Vector3(buttonPos.x, buttonPos.y, buttonPos.z - offset / buttonOffset);
+            if (method.settingAction != null)
+            {
+                gameObject.transform.localScale = new Vector3(buttonSize.x, buttonSize.y - .15f, buttonSize.z);
+                gameObject.transform.localPosition = new Vector3(buttonPos.x, buttonPos.y + .075f, buttonPos.z - offset / buttonOffset);
+                var settingObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                settingObj.Destroy<Rigidbody>();
+                //settingObj.ChangeMaterial(new Material(DefaultShader) { mainTexture = PathTextures[0] });
+                settingObj.ChangeMaterial(GetEnabled("Semi-Transparent Menu") ? TransparentMaterial(GetChangeColorA(NormalColor, .3f)) : NormalMaterial(NormalColor));
+                if (!UserInput.GetKey(KeyCode.Q)) settingObj.layer = GetEnabled("No Button Colliders") ? 2 : 0;
+                settingObj.GetComponent<BoxCollider>().isTrigger = true;
+                settingObj.transform.parent = menu.transform;
+                settingObj.transform.localScale = new Vector3(buttonSize.x, .1f, buttonSize.z);
+                settingObj.transform.localPosition = new Vector3(buttonPos.x, buttonPos.y - settingButtonOffset, buttonPos.z - offset / buttonOffset);
+                settingObj.transform.rotation = Quaternion.identity;
+                if (GetEnabled("Outline Menu"))  OutlineMenuObject(settingObj);
+                if (GetEnabled("Round Menu")) RoundMenuObject(settingObj);
+                settingObj.AddComponent<BtnCollider>().relatedText = $"{method.buttonText}_SettingSide";
+
+                if (GetEnabled("Round Menu")) RoundMenuObject(settingObj);
+                var image = new GameObject { transform = { parent = canvasObject.transform } }.AddComponent<Image>();
+                var materer = new Material(image.material);
+                image.material = materer;
+                image.material.SetTexture("_MainTex", PathTextures[0]);
+                var recter = image.GetComponent<RectTransform>();
+                recter.sizeDelta = new Vector2(.03f, .03f);
+                recter.localPosition = settingObj.transform.position + new Vector3(.01f, 0, 0);
+                recter.rotation = Quaternion.Euler(new Vector3(180, 90, 90));
+            }
+            else
+            {
+                gameObject.transform.localScale = GetEnabled("Annoying Menu") ? new Vector3(.09f, Random.Range(1f, 5f), Random.Range(.08f, .1f)) : buttonSize;
+                gameObject.transform.localPosition = new Vector3(buttonPos.x, buttonPos.y, buttonPos.z - offset / buttonOffset);
+            }
             gameObject.AddComponent<BtnCollider>().relatedText = method.buttonText;
-            if (GetEnabled("Outline Menu"))
-                OutlineMenuObject(gameObject);
-            Text text = new GameObject
+            if (GetEnabled("Outline Menu")) OutlineMenuObject(gameObject);
+            if (GetEnabled("Round Menu")) RoundMenuObject(gameObject);
+            var text = new GameObject
             {
                 transform =
                 {
@@ -802,36 +787,36 @@ namespace MysticClient.Menu
             text.color = buttonTextColor;
             text.supportRichText = true;
             text.fontSize = 1;
-            if (method.enabled)
-                gameObject.GetComponent<Renderer>().material.color = ButtonColorEnabled;
-            else
-                gameObject.GetComponent<Renderer>().material.color = ButtonColorDisable;
+            var color = method.enabled ? ButtonColorEnabled : ButtonColorDisable;
+            gameObject.GetComponent<Renderer>().material = GetEnabled("Semi-Transparent Menu") ? TransparentMaterial(GetChangeColorA(color, .3f)) : NormalMaterial(color);
             text.alignment = TextAnchor.MiddleCenter;
             text.fontStyle = buttonFontStyle;
             text.resizeTextForBestFit = true;
             text.resizeTextMinSize = 0;
-            RectTransform component = text.GetComponent<RectTransform>();
-            component.localPosition = Vector3.zero;
-            component.sizeDelta = new Vector2(.2f, .03f);
+            var component = text.GetComponent<RectTransform>();
+            //component.localPosition = Vector3.zero;
+            component.sizeDelta = menuTextSize;
             //component.localPosition = new Vector3(buttonTextPos.x, buttonTextPos.y, buttonTextPos.z - offset / buttonTextOffset); // 2.6
-            component.localPosition = gameObject.transform.position + new Vector3(.01f, 0, 0);
-            component.rotation = Quaternion.Euler(new Vector3(180f, 90f, 90f));
+            component.localPosition = gameObject.transform.position + new Vector3(GetEnabled("Semi-Transparent Menu") ? .02f : .01f, 0, 0);
+            component.rotation = Quaternion.Euler(new Vector3(180, 90, 90));
         }
         public static void DestroyMenu()
         {
-            Destroy(menu);
-            Destroy(canvasObject);
-            Destroy(reference);
+            menu.Destroy();
+            canvasObject.Destroy();
+            reference.Destroy();
+            referenceOther.Destroy();
             menu = null;
             menuBackground = null;
             canvasObject = null;
             reference = null;
+            referenceOther = null;
         }
         public static void RecreateMenu()
         {
             if (menu != null)
             {
-                Destroy(menu);
+                menu.Destroy();
                 menu = null;
                 CreateMenu();
                 RecenterMenu(GetEnabled("Right Hand Menu"), UserInput.GetKey(KeyCode.Q));
@@ -841,38 +826,66 @@ namespace MysticClient.Menu
         {
             if (!isKeyboardCondition)
             {
-                if (!isRightHanded)
+                if (!inKeyboard)
                 {
-                    if (GetEnabled("Watch Menu"))
+                    if (!GetEnabled("Face Menu"))
                     {
-                        menu.transform.position = new Vector3(0, .3f, 0) + RigUtils.MyOnlineRig.leftHandTransform.position;
-                        menu.transform.rotation = RigUtils.MyOnlineRig.bodyCollider.transform.rotation;
-                        menu.transform.RotateAround(menu.transform.position, menu.transform.forward, 90f);
-                        menu.transform.RotateAround(menu.transform.position, menu.transform.up, 90f);
+                        if (!isRightHanded)
+                        {
+                            if (GetEnabled("Watch Menu"))
+                            {
+                                menu.transform.position = new Vector3(0, .3f, 0) + RigUtils.MyOnlineRig.leftHandTransform.position;
+                                menu.transform.rotation = RigUtils.MyOnlineRig.bodyCollider.transform.rotation;
+                                menu.transform.RotateAround(menu.transform.position, menu.transform.forward, 90f);
+                                menu.transform.RotateAround(menu.transform.position, menu.transform.up, 90f);
+                                return;
+                            }
+                            menu.transform.position = RigUtils.MyOnlineRig.leftHandTransform.position;
+                            menu.transform.rotation = RigUtils.MyOnlineRig.leftHandTransform.rotation;
+                            return;
+                        }
+                        if (GetEnabled("Watch Menu"))
+                        {
+                            menu.transform.position = new Vector3(0, .3f, 0) + RigUtils.MyOnlineRig.rightHandTransform.position;
+                            menu.transform.rotation = RigUtils.MyOnlineRig.bodyCollider.transform.rotation;
+                            menu.transform.RotateAround(menu.transform.position, menu.transform.forward, 90f);
+                            menu.transform.RotateAround(menu.transform.position, menu.transform.up, 90f);
+                            return;
+                        }
+                        menu.transform.position = RigUtils.MyOnlineRig.rightHandTransform.position;
+                        menu.transform.rotation = RigUtils.MyOnlineRig.rightHandTransform.rotation;
+                        menu.transform.RotateAround(menu.transform.position, menu.transform.forward, 180f);
                         return;
                     }
-                    menu.transform.position = RigUtils.MyOnlineRig.leftHandTransform.position;
-                    menu.transform.rotation = RigUtils.MyOnlineRig.leftHandTransform.rotation;
-                    return;
-                }
-                if (GetEnabled("Watch Menu"))
-                {
-                    menu.transform.position = new Vector3(0, .3f, 0) + RigUtils.MyOnlineRig.rightHandTransform.position;
-                    menu.transform.rotation = RigUtils.MyOnlineRig.bodyCollider.transform.rotation;
+                    menu.transform.position = RigUtils.MyOnlineRig.headCollider.transform.position + Vector3.Scale(RigUtils.MyOnlineRig.headCollider.transform.forward, new Vector3(.75f, .75f, .75f));
+                    menu.transform.LookAt(RigUtils.MyPlayer.headCollider.transform.position);
                     menu.transform.RotateAround(menu.transform.position, menu.transform.forward, 90f);
                     menu.transform.RotateAround(menu.transform.position, menu.transform.up, 90f);
+                    menu.transform.RotateAround(menu.transform.position, menu.transform.forward, 180f);
                     return;
                 }
-                menu.transform.position = RigUtils.MyOnlineRig.rightHandTransform.position;
-                menu.transform.rotation = RigUtils.MyOnlineRig.rightHandTransform.rotation;
-                menu.transform.RotateAround(menu.transform.position, menu.transform.forward, 180f);
+                else
+                {
+                    if (Vector3.Distance(keyboard.transform.position, RigUtils.MyOnlineRig.bodyCollider.transform.position) > 5)
+                    {
+                        menu.transform.position = RigUtils.MyOnlineRig.headCollider.transform.position + Vector3.Scale(RigUtils.MyOnlineRig.headCollider.transform.forward, new Vector3(.75f, .75f, .75f)) + (Vector3.up / .5f);
+                        menu.transform.LookAt(RigUtils.MyPlayer.headCollider.transform.position);
+                        menu.transform.RotateAround(menu.transform.position, menu.transform.forward, 90f);
+                        menu.transform.RotateAround(menu.transform.position, menu.transform.up, 90f);
+                        menu.transform.RotateAround(menu.transform.position, menu.transform.forward, 180f);
+
+                        keyboard.transform.position = RigUtils.MyOnlineRig.bodyCollider.transform.position;
+                        keyboard.transform.rotation = RigUtils.MyOnlineRig.bodyCollider.transform.rotation;
+                    }
+                }
             }
             else
             {
                 try { TPC = GameObject.Find("Player Objects/Third Person Camera/Shoulder Camera").GetComponent<Camera>(); } catch { }
-                if (TPC != null)
+                TPC.gameObject.GetNamedChild("CM vcam1").SetActive(false);
+                if (TPC != null || inKeyboard)
                 {
-                    TPC.transform.position = new Vector3(100f, 100f, 100f);
+                    TPC.transform.position = new Vector3(100, 100, 100);
                     TPC.transform.LookAt(RigUtils.MyOnlineRig.transform.position);
                     menu.transform.parent = TPC.transform;
                     menu.transform.position = TPC.transform.position + Vector3.Scale(TPC.transform.forward, GetToolTip("Changed Menu Theme").buttonText.Contains("AZ") ? new Vector3(0.7f, 0.68f, 0.7f) : new Vector3(0.6f, 0.545f, 0.6f)) + Vector3.Scale(TPC.transform.up, new Vector3(-0.02f, .03f, -0.02f));
@@ -885,53 +898,53 @@ namespace MysticClient.Menu
                         {
                             if (Physics.Raycast(TPC.ScreenPointToRay(Mouse.current.position.ReadValue()), out var hit, 100))
                                 hit.transform.gameObject.GetComponent<BtnCollider>()?.OnTriggerEnter(reference.GetComponent<Collider>());
-                        }
-                        else
-                            reference.transform.position = new Vector3(999f, -999f, -999f);
-                    else
-                        CreateReference(GetEnabled("Right Hand Menu"));
+                        } else reference.transform.position = new Vector3(999, -999, -999);
+                    else CreateReference(GetEnabled("Right Hand Menu"));
                 }
             }
         }
 
         public static void CreateReference(bool isRightHanded)
         {
+            if (GetEnabled("Face Menu") || inKeyboard)
+            {
+                reference = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                reference.transform.parent = RigUtils.MyOnlineRig.rightHandTransform;
+                reference.GetComponent<Renderer>().material = GetEnabled("Semi-Transparent Menu") ? TransparentMaterial(GetChangeColorA(new Color32(167, 17, 237, 28), .3f)) : NormalMaterial(new Color32(167, 17, 237, 28));
+                reference.transform.localPosition = pointerPosition;
+                reference.transform.localScale = new Vector3(.01f, .01f, .01f);
+                reference.name = "buttonPresser";
+                referenceOther = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                referenceOther.transform.parent = RigUtils.MyOnlineRig.leftHandTransform;
+                referenceOther.GetComponent<Renderer>().material = GetEnabled("Semi-Transparent Menu") ? TransparentMaterial(GetChangeColorA(new Color32(167, 17, 237, 28), .3f)) : NormalMaterial(new Color32(167, 17, 237, 28));
+                referenceOther.transform.localPosition = pointerPosition;
+                referenceOther.transform.localScale = new Vector3(.01f, .01f, .01f);
+                referenceOther.name = "buttonPresser_Left";
+                return;
+            }
             reference = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             reference.transform.parent = isRightHanded ? RigUtils.MyOnlineRig.leftHandTransform : RigUtils.MyOnlineRig.rightHandTransform;
-            reference.GetComponent<Renderer>().material.color = new Color32(167, 17, 237, 28);
+            reference.GetComponent<Renderer>().material = GetEnabled("Semi-Transparent Menu") ? TransparentMaterial(GetChangeColorA(new Color32(167, 17, 237, 28), .3f)) : NormalMaterial(new Color32(167, 17, 237, 28));
             reference.transform.localPosition = pointerPosition;
-            reference.transform.localScale = new Vector3(0.01f, 0.01f, 0.01f);
+            reference.transform.localScale = new Vector3(.01f, .01f, .01f);
             reference.name = "buttonPresser";
-        }
-
-        private static void CreateKeyboardReference()
-        {
-            var click1 = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            click1.transform.parent = RigUtils.MyOnlineRig.rightHandTransform;
-            click1.GetComponent<Renderer>().material.color = new Color32(167, 17, 237, 28);
-            click1.transform.localPosition = pointerPosition;
-            click1.transform.localScale = new Vector3(0.01f, 0.01f, 0.01f);
-            click1.name = "buttonPresser_Right";
-            var click2 = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            click2.transform.parent = RigUtils.MyOnlineRig.leftHandTransform;
-            click2.GetComponent<Renderer>().material.color = new Color32(167, 17, 237, 28);
-            click2.transform.localPosition = pointerPosition;
-            click2.transform.localScale = new Vector3(0.01f, 0.01f, 0.01f);
-            click2.name = "buttonPresser_Left";
-            click1.Destroy(Time.deltaTime);
-            click2.Destroy(Time.deltaTime);
         }
 
         private static void OutlineMenuObject(GameObject obj)
         {
-            var outline = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            Destroy(outline.GetComponent<Rigidbody>());
-            Destroy(outline.GetComponent<BoxCollider>());
-            outline.transform.parent = menu.transform;
-            outline.transform.rotation = Quaternion.identity;
-            outline.transform.localScale = new Vector3(obj.transform.localScale.x - .01f, obj.transform.localScale.y + .01f, obj.transform.localScale.z + .01f);
-            outline.transform.position = obj.transform.position;
-            outline.GetComponent<Renderer>().material.color = outlineColor;
+            if (!GetEnabled("Semi-Transparent Menu")) // looks like shit when on
+            {
+                var outline = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                outline.Destroy<Rigidbody>();
+                outline.Destroy<Collider>();
+                outline.transform.parent = menu.transform;
+                outline.transform.rotation = Quaternion.identity;
+                var sub = GetToolTip("Changed Menu Theme").buttonText.Contains("NXO") ? .008f : .01f;
+                outline.transform.localScale = new Vector3(obj.transform.localScale.x - sub, obj.transform.localScale.y + sub, obj.transform.localScale.z + sub);
+                outline.transform.position = obj.transform.position;
+                outline.GetComponent<Renderer>().material = NormalMaterial(outlineColor);
+                if (GetEnabled("Round Menu")) RoundMenuObject(outline);
+            }
         }
 
         public static void Toggle(string buttonText)
@@ -941,9 +954,7 @@ namespace MysticClient.Menu
             {
                 pageNumber--;
                 if (pageNumber < 0)
-                {
                     pageNumber = lastPage;
-                }
             }
             else
             {
@@ -951,9 +962,7 @@ namespace MysticClient.Menu
                 {
                     pageNumber++;
                     if (pageNumber > lastPage)
-                    {
                         pageNumber = 0;
-                    }
                 }
                 else
                 {
@@ -969,38 +978,55 @@ namespace MysticClient.Menu
                         }
                         else
                         {
-                            var target = GetIndex(buttonText);
-                            if (target != null)
+                            if (buttonText == "Return")
                             {
-                                if (target.isTogglable)
+                                Settings.EnterPage(0, 0, 0);
+                            }
+                            else
+                            {
+                                if (buttonText == "Search")
                                 {
-                                    target.enabled = !target.enabled;
-                                    if (target.enabled)
-                                    {
-                                        if (target.method != null)
-                                        {
-                                            try { target.method.Invoke(); } catch { }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        if (target.disableMethod != null)
-                                        {
-                                            try { target.disableMethod.Invoke(); } catch { }
-                                        }
-                                    }
+                                    inKeyboard = true;
+                                    if (!GetEnabled("Current Catagory Searching"))
+                                        Settings.EnterPage(0, 0, 0);
                                 }
                                 else
                                 {
-                                    if (target.method != null)
+                                    var target = GetIndex(buttonText);
+                                    if (target != null)
                                     {
-                                        try { target.method.Invoke(); } catch { }
-                                    }
+                                        if (target.isTogglable)
+                                        {
+                                            target.enabled = !target.enabled;
+                                            if (target.enabled)
+                                            {
+                                                if (target.method != null)
+                                                {
+                                                    try { target.method.Invoke(); } catch { }
+                                                }
+                                            }
+                                            else
+                                            {
+                                                if (target.disableMethod != null)
+                                                {
+                                                    try { target.disableMethod.Invoke(); } catch { }
+                                                }
+                                                if (target.buttonText == "RGBSnowballs")
+                                                    throwables = null;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            if (target.method != null)
+                                            {
+                                                try { target.method.Invoke(); } catch { }
+                                            }
+                                        }
+                                        tooltipString = target.toolTip;
+                                    } else { if (buttonText.Contains("SettingSide")) GetIndex(buttonText.Split('_')[0]).settingAction.Invoke(); else Debug.LogError(buttonText + " does not exist"); }
                                 }
-                                tooltipString = target.toolTip;
                             }
-                            else { Debug.LogError(buttonText + " does not exist"); }
-                        }
+                        }          
                     }
                 }
             }
@@ -1017,24 +1043,20 @@ namespace MysticClient.Menu
                     {
                         if (!target.enabled)
                             menuHandAudio.PlayOneShot(AudioClips[0]); // enable 0
-                        else
-                            menuHandAudio.PlayOneShot(AudioClips[1]); // disable 1
+                        else menuHandAudio.PlayOneShot(AudioClips[1]); // disable 1
                     }
-                    else
-                        if (target.method != null)
+                    else if (target.method != null)
                         menuHandAudio.PlayOneShot(AudioClips[0]);
                 }
                 else
                 {
-                    if (index == "NextPage")
-                        menuHandAudio.PlayOneShot(AudioClips[8]);
-                    else if (index == "PreviousPage")
-                        menuHandAudio.PlayOneShot(AudioClips[8]);
-                    else if (index == "DisconnectingButton")
-                        menuHandAudio.PlayOneShot(AudioClips[8]);
-                    else if (index == "DestroyButton")
-                        menuHandAudio.PlayOneShot(AudioClips[8]);
-                    if (target == null && index != "NextPage" && index != "PreviousPage" && index != "DisconnectingButton" && index != "DestroyButton")
+                    if (index == "NextPage") menuHandAudio.PlayOneShot(AudioClips[8]);
+                    else if (index == "PreviousPage") menuHandAudio.PlayOneShot(AudioClips[8]);
+                    else if (index == "DisconnectingButton") menuHandAudio.PlayOneShot(AudioClips[8]);
+                    else if (index == "DestroyButton") menuHandAudio.PlayOneShot(AudioClips[8]);
+                    else if (index.Contains("SettingSide")) menuHandAudio.PlayOneShot(AudioClips[8]);
+                    else if (index.Contains("Return")) menuHandAudio.PlayOneShot(AudioClips[8]);
+                    if (target == null && index != "NextPage" && index != "PreviousPage" && index != "DisconnectingButton" && index != "DestroyButton" && !index.Contains("SettingSide") && index != "Return")
                         Debug.LogError($"button {index} does not exist");
                 }
                 menuHandAudio.volume = .3f;
@@ -1046,7 +1068,7 @@ namespace MysticClient.Menu
                     if (PhotonSystem.InRoom)
                     {
                         RigUtils.MyOfflineRig.PlayHandTapLocal(buttonSound, GetEnabled("Right Hand Menu"), 0.4f);
-                        new PhotonView().RPC("RPC_PlayHandTap", RpcTarget.Others, new object[]
+                        RPCManager.SoundEvent(RpcTarget.Others, new object[]
                         {
                          buttonSound,
                          GetEnabled("Right Hand Menu"),
@@ -1054,9 +1076,9 @@ namespace MysticClient.Menu
                         });
                         RPCProtection(RigUtils.MyNetPlayer);
                     }
-                    else RigUtils.MyOfflineRig.PlayHandTapLocal(buttonSound, GetEnabled("Right Hand Menu"), 0.4f);
+                    else RigUtils.MyOfflineRig.PlayHandTapLocal(buttonSound, GetEnabled("Right Hand Menu"), .4f);
                 } else */
-                RigUtils.MyOfflineRig.PlayHandTapLocal(buttonSound, GetEnabled("Right Hand Menu"), 0.4f);
+                RigUtils.MyOfflineRig.PlayHandTapLocal(buttonSound, GetEnabled("Right Hand Menu"), .4f);
             }
         }
         public static ButtonInfo GetIndex(string buttonText)
@@ -1119,7 +1141,6 @@ namespace MysticClient.Menu
                 PhotonNetwork.MaxResendsBeforeDisconnect = int.MaxValue;
                 PhotonNetwork.QuickResends = int.MaxValue;
                 PhotonNetwork.RemoveRPCs(RigUtils.MyRealtimePlayer);
-                PhotonNetwork.OpRemoveCompleteCacheOfPlayer(RigUtils.MyNetPlayer.ActorNumber);
                 PhotonNetwork.OpCleanActorRpcBuffer(RigUtils.MyNetPlayer.ActorNumber);
                 PhotonNetwork.RemoveBufferedRPCs(RigUtils.MyPhotonView.ViewID, null, null);
                 PhotonNetwork.RemoveRPCsInGroup(int.MaxValue);
@@ -1142,10 +1163,7 @@ namespace MysticClient.Menu
                 } catch (Exception ex) { Debug.LogError($"Error with sending event {code}, {ex}"); }
             else Debug.LogWarning("Could Not Raise Event" + code.ToString() + " Do To Not Being Connected To Photon Server");
         }
-        public static void LegacySendEvent(in byte code, in object evData, Photon.Realtime.Player target, bool reliable)
-        {
-            LegacySendEvent(code, evData, new RaiseEventOptions { TargetActors = new int[1] { target.ActorNumber } }, reliable);
-        }
+        public static void LegacySendEvent(in byte code, in object evData, Photon.Realtime.Player target, bool reliable) => LegacySendEvent(code, evData, new RaiseEventOptions { TargetActors = new int[1] { target.ActorNumber } }, reliable);
         public static void SendEvent(in byte code, in object evData, in NetEventOptions neo, bool reliable)
         {
             object[] objects = { NetworkSystem.Instance.ServerTimestamp, code, evData };
@@ -1170,7 +1188,7 @@ namespace MysticClient.Menu
         }
         public static string GetObjectPath(Transform transform)
         {
-            string path = "";
+            var path = "";
             while (transform.parent != null)
             {
                 transform = transform.parent;
@@ -1188,7 +1206,7 @@ namespace MysticClient.Menu
         {
             var objects = new List<GameObject>();
             foreach (var obj in GetGameObjects())
-                if (obj.name.Contains(objectName))
+                if (obj.name == objectName)
                     objects.Add(obj);
             return objects.ToArray();
         }
@@ -1202,27 +1220,33 @@ namespace MysticClient.Menu
         }
         public static GliderHoldable[] Gliders()
         {
-            if (gliders == null)
-                gliders = FindObjectsOfType<GliderHoldable>();
+            gliders ??= FindObjectsOfType<GliderHoldable>(true);
             return gliders;
         }
         public static GameObject[] GetGameObjects()
         {
-            if (gameObjects == null)
-                gameObjects = FindObjectsOfType<GameObject>();
+            gameObjects ??= FindObjectsOfType<GameObject>(true);
             return gameObjects;
         }
         public static BuilderPiece[] GetPieces()
         {
-            if (builderPieces == null)
-                builderPieces = FindObjectsOfType<BuilderPiece>();
+            builderPieces ??= FindObjectsOfType<BuilderPiece>();
             return builderPieces;
         }
         public static GorillaKeyboardButton[] GetKeyboardButtons()
         {
-            if (keyboardButtons == null)
-                keyboardButtons = FindObjectsOfType<GorillaKeyboardButton>();
+            keyboardButtons ??= FindObjectsOfType<GorillaKeyboardButton>();
             return keyboardButtons;
+        }
+        public static SnowballThrowable[] GetThrowables()
+        {
+            throwables ??= FindObjectsOfType<SnowballThrowable>();
+            return throwables;
+        }
+        public static GorillaRopeSwing[] GetRopes()
+        {
+            ropes ??= FindObjectsOfType<GorillaRopeSwing>();
+            return ropes;
         }
         public static void JoinRoom(string name, JoinType joinType) => NetworkController.AttemptToJoinSpecificRoom(name, joinType);
         public static bool AddInfected(NetPlayer player)
@@ -1291,13 +1315,6 @@ namespace MysticClient.Menu
             return await tsc.Task;
         }
 
-        public static GorillaRopeSwing[] GetRopes()
-        {
-            if (ropes == null)
-                ropes = FindObjectsOfType<GorillaRopeSwing>();
-            return ropes;
-        }
-
         public static object GetProjectile(int hash)
         {
             var obj = ObjectPools.instance.Instantiate(hash);
@@ -1323,13 +1340,17 @@ namespace MysticClient.Menu
         public static Color RGBColor()
         {
             var time = Time.time;
-            var r = Mathf.Sin(time * 2f) * 0.5f + 0.5f;
-            var g = Mathf.Sin(time * 1.5f) * 0.5f + 0.5f;
-            var b = Mathf.Sin(time * 2.5f) * 0.5f + 0.5f;
+            var r = Mathf.Sin(time * 2f) * .5f + .5f;
+            var g = Mathf.Sin(time * 1.5f) * .5f + .5f;
+            var b = Mathf.Sin(time * 2.5f) * .5f + .05f;
             return new Color(r, g, b, 1);
         }
-
-        public static Color HardColor(int index) => Settings.colors[index % Settings.colors.Length];
+        public static Color HardColor(int index) 
+        {
+            if (GetEnabled("Use System Colors"))
+                return SCToUC(Settings.scolor[index % Settings.scolor.Length]);
+            else return Settings.colors[index % Settings.colors.Length];
+        }
 
         public static Material TransparentMaterial(Color color)
         {
@@ -1349,6 +1370,9 @@ namespace MysticClient.Menu
             col.a = a;
             return col;
         }
+
+        public static Material NormalMaterial(Color color) => new Material(GetEnabled("Shiny Menu") ? UniversalShader : UberShader) { color = color };
+
         public static Vector3 RoundToGrid(Vector3 position)
         {
             var x = Mathf.Round(position.x / gridSize) * gridSize;
@@ -1395,9 +1419,131 @@ namespace MysticClient.Menu
             return RandomText(length);
         }
 
+        private static void RoundMenuObject(GameObject obj, float bevel = .02f)
+        {
+            var roundRend = obj.GetComponent<Renderer>();
+            var oldScale = obj.transform.localScale;
+            var oldPos = obj.transform.localPosition;
+            GameObject CreatePrimitive(PrimitiveType type, Vector3 pos, Vector3 scale, Quaternion rot)
+            {
+                var gameObj = GameObject.CreatePrimitive(type);
+                var renderer = gameObj.GetComponent<Renderer>();
+                renderer.enabled = roundRend.enabled;
+                Destroy(gameObj.GetComponent<Collider>());
+                gameObj.transform.parent = menu.transform;
+                gameObj.transform.localPosition = pos;
+                gameObj.transform.localScale = scale;
+                gameObj.transform.rotation = rot;
+                return gameObj;
+            }
+            var scaleA = oldScale + new Vector3(0, bevel * -2.55f, 0);
+            var scaleB = oldScale + new Vector3(0, 0, -bevel * 2);
+            var baseA = CreatePrimitive(PrimitiveType.Cube, oldPos, scaleA, Quaternion.identity);
+            var baseB = CreatePrimitive(PrimitiveType.Cube, oldPos, scaleB, Quaternion.identity);
+            var halfY = oldScale.y / 2f;
+            var halfZ = oldScale.z / 2f;
+            var cornerScale = new Vector3(bevel * 2.55f, oldScale.x / 2f, bevel * 2f);
+            var cornerRot = Quaternion.Euler(0, 0, 90);
+            var corners = new GameObject[]
+            {
+                CreatePrimitive(PrimitiveType.Cylinder, oldPos + new Vector3(0, halfY - (bevel * 1.275f), halfZ - bevel), cornerScale, cornerRot),
+                CreatePrimitive(PrimitiveType.Cylinder, oldPos + new Vector3(0, -halfY + (bevel * 1.275f), halfZ - bevel), cornerScale, cornerRot),
+                CreatePrimitive(PrimitiveType.Cylinder, oldPos + new Vector3(0, halfY - (bevel * 1.275f), -halfZ + bevel), cornerScale, cornerRot),
+                CreatePrimitive(PrimitiveType.Cylinder, oldPos + new Vector3(0, -halfY + (bevel * 1.275f), -halfZ + bevel), cornerScale, cornerRot)
+            };
+            var allObjs = new GameObject[] { baseA, baseB }.Concat(corners).ToArray();
+            foreach (var objs in allObjs)
+            {
+                var changer = objs.AddComponent<ColorChanger.Clamper>();
+                changer.target = roundRend;
+                changer.Start();
+            }
+            roundRend.enabled = false;
+        }
+
+        // from zyro at https://github.com/zyroyz/AetherPadTemp/blob/main/AetherTemp/Menu/Particles.cs in CreateFireAtPosition and modifyed by me
+        public static void CreateParticles(Vector3 position, ParticleSystem.MinMaxGradient gradient)
+        {
+            var fire = new GameObject("FireParticle");
+            fire.transform.position = position;
+            var particles = fire.AddComponent<ParticleSystem>();
+            var module = particles.main;
+
+            module.startColor = gradient;
+            module.startSize = .05f;
+            module.startSpeed = 2f;
+            module.startLifetime = 1.5f;
+            module.loop = true;
+            module.simulationSpace = ParticleSystemSimulationSpace.World;
+            module.maxParticles = 30;
+
+            var renderer = particles.GetComponent<ParticleSystemRenderer>();
+            renderer.material = new Material(ParticleShader);
+            renderer.material.SetColor("_Color", Color.black);
+
+            var emission = particles.emission;
+            emission.rateOverTime = 20f;
+
+            var shape = particles.shape;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 20f;
+            shape.radius = .1f;
+
+            fire.Destroy(.5f);
+        }
+
+        /*public static void AddTrailToObject(ref GameObject obj, float width, Material material)
+        {
+            var trail = obj.GetOrAddComponent<TrailRenderer>();
+            trail.material = material;
+            trail.time = 1f;
+            trail.startWidth = width;
+            trail.endWidth = 0;
+            trail.minVertexDistance = .1f;
+        }*/
+
+        public static void LoadAudios(string btnname)
+        {
+            if (comfirmLoad)
+            {
+                for (int i = 0; i < Stringys[0].Length; i++)
+                {
+                    if (AudioClips[i] == null)
+                        AudioClips[i] = Loaders.GetAudioFromURL(Stringys[0][i]);
+                    else NotifiLib.SendNotification(NotifUtils.Warning() + "All Audios Have Already Been Loaded", 1f);
+                }
+                for (int i = 0; i < Stringys[1].Length; i++)
+                {
+                    if (LinkTextures[i] == null)
+                        LinkTextures[i] = Loaders.LoadImageFromURL(Stringys[1][i]);
+                }
+                fastLoad = false;
+                GetIndex(btnname).enabled = false;
+            }
+            else
+            {
+                NotifiLib.SendNotification(NotifUtils.Warning() + "This Will Make Your Game Have A HEAVY Lag Spike For Around A Minute If You Wish To Continue Press A And If You Wish To Cancel Press B", 5f);
+                if (Controller.rightControllerPrimaryButton) comfirmLoad = true;
+                if (Controller.rightControllerSecondaryButton) GetIndex(btnname).enabled = false;
+            }
+        }
+
+        private static void ImageMenuButton(GameObject button, Texture2D imageTX)
+        {
+            var image = new GameObject { transform = { parent = canvasObject.transform } }.AddComponent<Image>();
+            var materer = new Material(image.material);
+            image.material = materer;
+            image.material.SetTexture("_MainTex", imageTX);
+            var recter = image.GetComponent<RectTransform>();
+            recter.sizeDelta = new Vector2(.03f, .03f);
+            recter.localPosition = button.transform.position + new Vector3(.01f, 0, 0);
+            recter.rotation = Quaternion.Euler(new Vector3(180, 90, 90));
+        }
+
         public static GameObject menu;
         public static GameObject menuBackground;
         public static GameObject reference;
+        public static GameObject referenceOther;
         public static GameObject canvasObject;
         private static GameObject planet = null;
         private static GameObject planetRing = null;
@@ -1409,7 +1555,12 @@ namespace MysticClient.Menu
         public static Camera TPC;
         public static Camera mainCamera;
 
-        public static bool inKeyboard;
+        public static bool inKeyboard = false;
+        private static bool foundBoards;
+        private static bool foundSmallBoards;
+        private static bool pressedKeys;
+        public static bool fastLoad;
+        private static bool comfirmLoad = false;
 
         public static int pageNumber = 0;
         public static int buttonsType = 0;
@@ -1420,6 +1571,7 @@ namespace MysticClient.Menu
         private static float gridSize = 1f;
 
         private static Text tooltipText;
+        private static Text inputTextObject;
 
         public static Color boardColor = Color.black;
 
@@ -1432,51 +1584,33 @@ namespace MysticClient.Menu
         private static BuilderPiece[] builderPieces = null;
 
         private static GorillaKeyboardButton[] keyboardButtons = null;
+        public static GorillaKeyboardButton gorillaKeys;
+
+        public static SnowballThrowable[] throwables = null;
 
         private static VRRig Ghost = null;
 
         //private static GradientColorKey[] MenuColorKeys = new GradientColorKey[4];
         public static Color buttonTextColor = Color.black;
 
-        public static BindingFlags NonPublicInstance { get { return BindingFlags.NonPublic | BindingFlags.Instance; } }
+        public static BindingFlags NonPublicInstance => BindingFlags.NonPublic | BindingFlags.Instance;
 
-        public static Shader UberShader { get { return Shader.Find("GorillaTag/UberShader"); } }
+        public static RaiseEventOptions Others => new RaiseEventOptions { Receivers = ReceiverGroup.Others };
 
-        public static Shader UniversalShader { get { return Shader.Find("Universal Render Pipeline/Lit"); } }
-
-        public static Shader DefaultShader { get { return Shader.Find("Sprites/Default"); } }
-
-        public static Shader TextShader { get { return Shader.Find("GUI/Text Shader"); } }
+        public static Shader UberShader => Shader.Find("GorillaTag/UberShader");
+        public static Shader UniversalShader => Shader.Find("Universal Render Pipeline/Lit");
+        public static Shader DefaultShader => Shader.Find("Sprites/Default");
+        public static Shader ParticleShader => Shader.Find("Universal Render Pipeline/Particles/Unlit");
+        public static Shader TextShader => Shader.Find("GUI/Text Shader");
 
         public static string tooltipString;
+        public static string DzongkhaMenuName = $"<color=magenta>མཚན་མོ།</color> <color=blue>ལས༌མགྲོན</color> <color=cyan>ཐོ{PluginInfo.Version}</color>";
         //private static string DateTimeTitle;
+        private static string boardName;
+        public static string KeyboardInput = "";
 
         private static string MOTDText =
-        "Added Menu Saving, " +
-        "Use System Colors, " +
-        "141 New Setting Colors [System], " +
-        "Dynamic Sounds, " +
-        "Block Mods, " +
-        "Minecraft, " +
-        "Rope Mods, " +
-        "Super Speed Boost, " +
-        "Improved GunLib, " +
-        "Get ID Gun, " +
-        "Get Creation Date Gun, " +
-        "Planet, " +
-        "Voice Commands, " +
-        "Menu Trail, " +
-        "Annoying Menu, " +
-        "Change Menu Font, " +
-        "Array List, " +
-        "Shiny Menu, " +
-        "Disable Stump Planet, " +
-        "Make Ghost/Invis Toggled, " +
-        "Fixed Sound Spammers, " +
-        "Spider Monke, " +
-        "Pull Speed, " +
-        "No Tag On Join, " +
-        "More Visual Mods";
+        "Added No Button Colliders, Improved Spider Monke, And Fixed Some Stuff";
 
 
         private static string Credits =
@@ -1485,7 +1619,7 @@ namespace MysticClient.Menu
             "Mystic [The Real Owner]\n" +
             "Anthonyz [for being cool]" +
             "\n\n\n\n\n\n" +
-            "You Are Currently Using Mystic Client Version [" + PluginInfo.Version + "] Check Discord Or Github For Any Future Updates";
+            $"You Are Currently Using Mystic Client Version {PluginInfo.Version} With A Mod Count Of {Plugin.MenuButtonCount}, Check Discord Or Github For Any Future Updates";
     }
 
 

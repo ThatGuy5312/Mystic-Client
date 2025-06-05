@@ -2,11 +2,16 @@
 using MysticClient.Menu;
 using MysticClient.Mods;
 using MysticClient.Utils;
+using OculusSampleFramework;
+using OVR.OpenVR;
 using Photon.Pun;
 using Photon.Realtime;
+using PlayFab.GroupsModels;
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
+using static DevConsole.MessagePayload;
 using static MysticClient.Mods.Movement;
 
 namespace MysticClient.Classes
@@ -108,9 +113,31 @@ namespace MysticClient.Classes
                 networked[8] = false;
             }
         }
-        public static void DestroyNetworkedObjects()
+        public static void NetworkMinecraft()
         {
-            
+            if (!networked[10])
+            {
+                AddNetwork(MinecraftNetwork);
+                networked[10] = true;
+                networked[11] = false;
+            }
+        }
+        public static void UnNetworkMinecraft()
+        {
+            if (!networked[11])
+            {
+                RemoveNetwork(MinecraftNetwork);
+                networked[11] = true;
+                networked[10] = false;
+            }
+        }
+        public static void DestroyNetworkedObjects() // i know there is a way better way of doing this but this is the only one that works
+        {
+            foreach (var platsRight in jump_right_network) platsRight.Destroy();
+            foreach (var platsLeft in jump_left_network) platsLeft.Destroy();
+            foreach (var plats in platgun_network) plats.Destroy();
+            foreach (var balls in ballsgun_network) balls.Destroy();
+            foreach (var blocks in Fun.MinecraftCubes) { Fun.MinecraftCubes.Remove(blocks); blocks.Destroy(); }
         }
         /*public static void RaiseNetwork(string code, object content, RaiseEventOptions reo, bool reliable)
         {
@@ -120,7 +147,7 @@ namespace MysticClient.Classes
                 Main.LegacySendEvent(126, data, reo, reliable);
             }
         }*/
-        private static void PlatformNetwork(EventData eventData)
+        public static void PlatformNetwork(EventData eventData)
         {
             byte code = eventData.Code;
             if (code == 69)
@@ -145,6 +172,7 @@ namespace MysticClient.Classes
                     };
                     colorChanger.loop = true;
                 } else jump_left_network[eventData.Sender].GetComponent<Renderer>().material.color = (Color)array[5];
+                //if ((bool)array[8]) Main.RoundOtherObject(jump_left_network[eventData.Sender]);
             }
             if (code == 70)
             {
@@ -168,6 +196,7 @@ namespace MysticClient.Classes
                     };
                     colorChanger.loop = true;
                 } else jump_right_network[eventData.Sender].GetComponent<Renderer>().material.color = (Color)array[5];
+                //if ((bool)array[8]) Main.RoundOtherObject(jump_right_network[eventData.Sender]);
             }
             if (code == 71)
             {
@@ -199,15 +228,13 @@ namespace MysticClient.Classes
                 }
             }
         }
-        private static void ProjectileNetwork(EventData eventData)
+        public static void ProjectileNetwork(EventData eventData)
         {
             byte code = eventData.Code;
             if (code == 111)
-            {
                 ProjectileLib.LaunchProjectile((ProjectileLib.ProjectileData)eventData.CustomData);
-            }
         }
-        private static void PlatformGunNetwork(EventData eventData)
+        public static void PlatformGunNetwork(EventData eventData)
         {
             byte code = eventData.Code;
             if (code == 110)
@@ -239,31 +266,31 @@ namespace MysticClient.Classes
                 }
             }
         }
-        private static void BallGunNetwork(EventData eventData)
+        public static void BallGunNetwork(EventData eventData)
         {
             byte code = eventData.Code;
             if (code == 100)
             {
                 object[] array = (object[])eventData.CustomData;
-                ball_network[eventData.Sender] = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                ball_network[eventData.Sender].layer = 8;
-                ball_network[eventData.Sender].name = "BALLSNetwork";
-                ball_network[eventData.Sender].transform.localScale = new Vector3(0.1f, 0.1f, 0.1f);
-                ball_network[eventData.Sender].transform.position = (Vector3)array[0];
-                ball_network[eventData.Sender].transform.rotation = (Quaternion)array[1];
-                ball_network[eventData.Sender].GetComponent<Renderer>().material.color = (Color)array[3];
-                var trail = ball_network[eventData.Sender].AddComponent<TrailRenderer>();
+                ballsgun_network[eventData.Sender] = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                ballsgun_network[eventData.Sender].layer = 8;
+                ballsgun_network[eventData.Sender].name = "BALLSNetwork";
+                ballsgun_network[eventData.Sender].transform.localScale = new Vector3(0.1f, 0.1f, 0.1f);
+                ballsgun_network[eventData.Sender].transform.position = (Vector3)array[0];
+                ballsgun_network[eventData.Sender].transform.rotation = (Quaternion)array[1];
+                ballsgun_network[eventData.Sender].GetComponent<Renderer>().material.color = (Color)array[3];
+                var trail = ballsgun_network[eventData.Sender].AddComponent<TrailRenderer>();
                 trail.material = new Material(Shader.Find("Sprites/Default"));
                 trail.time = 1;
                 trail.startWidth = .1f;
                 trail.endWidth = 0;
                 trail.minVertexDistance = 1;
                 trail.material.color = (Color)array[3];
-                var ballRB = ball_network[eventData.Sender].AddComponent(typeof(Rigidbody)) as Rigidbody;
+                var ballRB = ballsgun_network[eventData.Sender].AddComponent(typeof(Rigidbody)) as Rigidbody;
                 ballRB.velocity = (Vector3)array[2];
             }
         }
-        private static void FrozoneNetwork(EventData eventData)
+        public static void FrozoneNetwork(EventData eventData)
         {
             byte code = eventData.Code;
             if (code == 90)
@@ -311,12 +338,23 @@ namespace MysticClient.Classes
                 Destroy(frozone_left_network[eventData.Sender], 1);
             }
         }
-        public static void SendCube(object[] data) // next update
+        public static void SendCube(Vector3 pos, Quaternion rot, int textureID, string cubeID)
         {
             var others = new RaiseEventOptions { Receivers = ReceiverGroup.Others };
+            object[] data = { pos, rot, textureID, cubeID, };
             Main.LegacySendEvent(112, data, others, true);
         }
-        private static void MinecraftNetwork(EventData eventData)
+        public static void RemoveOtherCube(string cubeID)
+        {
+            var others = new RaiseEventOptions { Receivers = ReceiverGroup.Others };
+            Main.LegacySendEvent(113, cubeID, others, true);
+        }
+        public static void ChangeOtherCollider(string cubeID, bool toRemove)
+        {
+            var others = new RaiseEventOptions { Receivers = ReceiverGroup.Others };
+            Main.LegacySendEvent(toRemove ? (byte)114 : (byte)115, cubeID, others, true);
+        }
+        public static void MinecraftNetwork(EventData eventData)
         {
             if (eventData.Code == 112)
             {
@@ -324,12 +362,66 @@ namespace MysticClient.Classes
                 var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 cube.transform.position = (Vector3)array[0];
                 cube.transform.rotation = (Quaternion)array[1];
-                cube.GetComponent<Renderer>().material.shader = Shader.Find((string)array[2]);
-                cube.GetComponent<Renderer>().material.mainTexture = Main.MCTextures[(int)array[3]];
+                if ((int)array[2] == 8)
+                    cube.GetComponent<Renderer>().material.shader = Main.DefaultShader;
+                else if ((int)array[2] == 10)
+                    cube.GetComponent<Renderer>().material = Main.TransparentMaterial(Main.GetChangeColorA(Color.white, .5f));
+                else cube.GetComponent<Renderer>().material.shader = Main.UniversalShader;
+                cube.GetComponent<Renderer>().material.mainTexture = Main.MCTextures[(int)array[2]];
+                cube.AddComponent<Fun.CubeManager>().cubeID = (string)array[3];
+                Fun.MinecraftCubes.Add(cube);
             }
             if (eventData.Code == 113)
             {
+                var id = (string)eventData.CustomData;
+                foreach (var cubes in Fun.MinecraftCubes)
+                {
+                    var cube = cubes.GetComponent<Fun.CubeManager>();
+                    if (cube.cubeID == id)
+                    { cubes.Destroy(); Fun.MinecraftCubes.Remove(cubes); }
+                }
+            }
+            if (eventData.Code == 114)
+            {
+                var id = (string)eventData.CustomData;
+                foreach (var cubes in Fun.MinecraftCubes)
+                {
+                    var cube = cubes.GetComponent<Fun.CubeManager>();
+                    if (cube.cubeID == id)
+                    { cubes.layer = 8; }
+                }
+            }
+            if (eventData.Code == 115)
+            {
+                var id = (string)eventData.CustomData;
+                foreach (var cubes in Fun.MinecraftCubes)
+                {
+                    var cube = cubes.GetComponent<Fun.CubeManager>();
+                    if (cube.cubeID == id)
+                        cubes.layer = 0;
+                }
+            }
+        }
 
+        public class Global : MonoBehaviour, IOnEventCallback
+        {
+            void Start() => PhotonNetwork.AddCallbackTarget(this);
+
+            public static bool ReceiveGlobalPlatforms = false;
+            public static bool ReceiveGlobalProjectiles = false;
+            public static bool ReceiveGlobalPlatformGun = false;
+            public static bool ReceiveGlobalBallGun = false;
+            public static bool ReceiveGlobalFrozone = false;
+            public static bool ReceiveGlobalMinecraft = false;
+
+            public void OnEvent(EventData eventData)
+            {
+                if (ReceiveGlobalPlatforms) PlatformNetwork(eventData);
+                if (ReceiveGlobalProjectiles) ProjectileNetwork(eventData);
+                if (ReceiveGlobalPlatformGun) PlatformGunNetwork(eventData);
+                if (ReceiveGlobalBallGun) BallGunNetwork(eventData);
+                if (ReceiveGlobalFrozone) FrozoneNetwork(eventData);
+                if (ReceiveGlobalMinecraft) MinecraftNetwork(eventData);
             }
         }
     }

@@ -17,9 +17,9 @@ namespace MysticClient.Mods
         public static void NameTags()
         {
             foreach (var rigs in RigUtils.VRRigs)
-                CreateText(rigs.playerName, rigs.transform.position + new Vector3(0, .5f, 0), rigs.transform.position.ToLookQuat(RigUtils.MyPlayer.headCollider.transform.position));
+                CreateText(rigs.playerNameVisible, rigs.transform.position + new Vector3(0, .5f, 0), rigs.transform.position.ToLookQuat(RigUtils.MyPlayer.headCollider.transform.position));
         }
-        public static void RainOff() // instiantate on startup (spelling fr)
+        public static void RainOff() // Instantiate on startup
         {
             BetterDayNightManager.instance.weatherCycle[BetterDayNightManager.instance.currentWeatherIndex] = BetterDayNightManager.WeatherType.None;
             BetterDayNightManager.instance.CurrentWeather();
@@ -42,7 +42,7 @@ namespace MysticClient.Mods
             foreach (var rigs in RigUtils.VRRigs)
                 if (rigs != RigUtils.MyOfflineRig)
                 {
-                    rigs.mainSkin.material.shader = Shader.Find("GUI/Text Shader");
+                    rigs.mainSkin.material.shader = TextShader;
                     var gpl = rigs.GetComponent<GorillaSpeakerLoudness>();
                     var main = new Color(rigs.playerColor.r, rigs.playerColor.g, rigs.playerColor.b, gpl.Loudness * .3f);
                 }
@@ -54,8 +54,7 @@ namespace MysticClient.Mods
             if (righthandTrail == null)
             {
                 righthandTrail = RigUtils.MyPlayer.rightControllerTransform.AddComponent<TrailRenderer>();
-                righthandTrail.material = new Material(Shader.Find("Sprites/Default"));
-                righthandTrail.material.color = handTrailColor;
+                righthandTrail.material = new Material(DefaultShader) { color = handTrailColor };
                 righthandTrail.time = 1f;
                 righthandTrail.startWidth = 1;
                 righthandTrail.endWidth = 0;
@@ -99,7 +98,7 @@ namespace MysticClient.Mods
                         lineRend.useWorldSpace = true;
                         lineRend.SetPosition(0, RigUtils.MyOnlineRig.rightHandTransform.position);
                         lineRend.SetPosition(1, RigUtils.GetRigFromPlayer(players).transform.position);
-                        lineRend.material.shader = Shader.Find("GUI/Text Shader");
+                        lineRend.material.shader = TextShader;
                         Destroy(lineRend, Time.deltaTime);
                         Destroy(line, Time.deltaTime);
                     }
@@ -118,13 +117,12 @@ namespace MysticClient.Mods
                 lineRend.useWorldSpace = true;
                 lineRend.SetPosition(0, RigUtils.MyOnlineRig.rightHandTransform.position);
                 lineRend.SetPosition(1, rigs.transform.position);
-                lineRend.material.shader = Shader.Find("GUI/Text Shader");
+                lineRend.material.shader = TextShader;
                 Destroy(lineRend, Time.deltaTime);
                 Destroy(line, Time.deltaTime);
                 if (IsTagged(rigs))
                     lineRend.material.color = Color.red;
-                else
-                    lineRend.material.color = Color.green;
+                else lineRend.material.color = Color.green;
             }
         }
         public static void CasualTracers()
@@ -140,7 +138,7 @@ namespace MysticClient.Mods
                 lineRend.useWorldSpace = true;
                 lineRend.SetPosition(0, RigUtils.MyOnlineRig.rightHandTransform.position);
                 lineRend.SetPosition(1, rigs.transform.position);
-                lineRend.material.shader = Shader.Find("GUI/Text Shader");
+                lineRend.material.shader = TextShader;
                 Destroy(lineRend, Time.deltaTime);
                 Destroy(line, Time.deltaTime);
             }
@@ -149,9 +147,8 @@ namespace MysticClient.Mods
         {
             foreach (var rigs in RigUtils.VRRigs)
             {
-                rigs.mainSkin.material.shader = Shader.Find("GorillaTag/UberShader");
                 var main = new Color(rigs.playerColor.r, rigs.playerColor.g, rigs.playerColor.b, 1f);
-                rigs.mainSkin.material.color = main;
+                rigs.mainSkin.material = new Material(Main.UberShader) { color = main };
             }
         }
         public static void InfectionESP()
@@ -159,7 +156,7 @@ namespace MysticClient.Mods
             foreach (var rigs in RigUtils.VRRigs)
                 if (rigs != RigUtils.MyOfflineRig)
                 {
-                    rigs.mainSkin.material.shader = Shader.Find("GUI/Text Shader");
+                    rigs.mainSkin.material.shader = TextShader;
                     if (rigs.mainSkin.material.name.Contains("fected") || rigs.mainSkin.material.name.Contains("it"))
                         rigs.mainSkin.material.color = Color.Lerp(Color.black, Color.red, Mathf.PingPong(Time.time, 1));
                     else
@@ -171,7 +168,7 @@ namespace MysticClient.Mods
             foreach (var rigs in RigUtils.VRRigs)
                 if (rigs != RigUtils.MyOfflineRig)
                 {
-                    rigs.mainSkin.material.shader = Shader.Find("GUI/Text Shader");
+                    rigs.mainSkin.material.shader = TextShader;
                     var main = new Color(rigs.playerColor.r, rigs.playerColor.g, rigs.playerColor.b, 1f);
                     rigs.mainSkin.material.color = main;
                 }
@@ -182,7 +179,7 @@ namespace MysticClient.Mods
             {
                 foreach (var players in RigUtils.NetPlayers)
                     if (players == Main.GorillaHuntManager.GetTargetOf(RigUtils.MyNetPlayer))
-                        RigUtils.GetRigFromPlayer(players).mainSkin.material.shader = Shader.Find("GUI/Text Shader");
+                        RigUtils.GetRigFromPlayer(players).mainSkin.material.shader = TextShader;
             } else { NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not In The Hunt GameMode"); GetToolTip(tooltip).enabled = false; }
         }
     }

@@ -7,23 +7,55 @@ using System.Collections;
 using UnityEngine;
 using MysticClient.Classes;
 using BepInEx;
+using static MysticClient.Mods.Fun;
+using Steamworks;
 
 namespace MysticClient.Mods
 {
     public class Rig : GunLib
     {
+        public static void SetRig(bool toDisable = false) => RigUtils.MyOfflineRig.enabled = !toDisable;
 
-        private static float MonkeSize;
+        private static GameObject rigThrowParent = null;
+        public static void ThrowRig()
+        {
+            if (Controller.rightGrab || UserInput.GetMouseButton(0))
+            {
+                if (rigThrowParent == null)
+                {
+                    rigThrowParent = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    rigThrowParent.layer = 8;
+                    rigThrowParent.Destroy<Renderer>();
+                }
+                else
+                {
+                    rigThrowParent.transform.position = RigUtils.MyOnlineRig.rightHandTransform.position;
+                    rigThrowParent.transform.rotation = RigUtils.MyOnlineRig.rightHandTransform.rotation;
+                }
+            }
+            else if (rigThrowParent != null)
+            {
+                SetRig(true);
+                var throwRB = rigThrowParent.AddComponent(typeof(Rigidbody)) as Rigidbody;
+                throwRB.velocity = RigUtils.MyPlayer.rightHandCenterVelocityTracker.GetAverageVelocity(true, 0f);
+                RigUtils.MyOfflineRig.transform.position = rigThrowParent.transform.position;
+                RigUtils.MyOfflineRig.transform.rotation = rigThrowParent.transform.rotation;
+            }
+            if (Controller.rightControllerPrimaryButton || UserInput.GetMouseButton(2)) SetRig();
+        }
+
+        private static float MonkeSize = 1f;
         public static void SizeChanger()
         {
-            if (Controller.rightControllerIndexFloat > 0.3f || UserInput.GetKey(KeyCode.Alpha1))
-                MonkeSize += 0.1f;
-            if (Controller.leftControllerIndexFloat > 0.3f || UserInput.GetKey(KeyCode.Alpha2))
-                MonkeSize -= 0.1f;
+            if (Controller.rightControllerIndexFloat.TriggerDown() || UserInput.GetKey(KeyCode.Alpha1))
+                MonkeSize += .1f;
+            if (Controller.leftControllerIndexFloat.TriggerDown() || UserInput.GetKey(KeyCode.Alpha2))
+                MonkeSize -= .1f;
             if (Controller.rightControllerPrimaryButton || UserInput.GetKey(KeyCode.Alpha3))
                 MonkeSize = 1f;
-            RigUtils.MyPlayer.scale = MonkeSize;
-            RigUtils.MyOfflineRig.scaleFactor = MonkeSize;
+            RigUtils.MyOfflineRig.transform.localScale = Vector3.one * MonkeSize;
+            RigUtils.MyOfflineRig.NativeScale = MonkeSize;
+            RigUtils.MyPlayer.SetNativeScale(new NativeSizeChangerSettings { playerSizeScale = MonkeSize });
         }
         public static void WackyMonke()
         {

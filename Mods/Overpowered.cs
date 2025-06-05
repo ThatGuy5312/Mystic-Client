@@ -8,6 +8,7 @@ using MysticClient.Notifications;
 using UnityEngine.Animations.Rigging;
 using GorillaLocomotion.Gameplay;
 using static ThrowableBug;
+using PlayFab.ClientModels;
 
 namespace MysticClient.Mods
 {
@@ -208,10 +209,8 @@ namespace MysticClient.Mods
             {
                 if (PhotonSystem.IsMasterClient)
                 {
-                    if (Controller.rightControllerIndexFloat > 0.3f)
-                    {
+                    if (Controller.rightControllerIndexFloat.TriggerDown())
                         RPCManager.SlowEvent(NetEventOptions.RecieverTarget.others);
-                    }
                 }
                 else
                 {
@@ -231,10 +230,8 @@ namespace MysticClient.Mods
             {
                 if (PhotonSystem.IsMasterClient)
                 {
-                    if (Controller.rightControllerIndexFloat > 0.3f)
-                    {
+                    if (Controller.rightControllerIndexFloat.TriggerDown())
                         RPCManager.VibrateEvent(NetEventOptions.RecieverTarget.others);
-                    }
                 }
                 else
                 {
@@ -281,9 +278,7 @@ namespace MysticClient.Mods
             if (PhotonSystem.InRoom)
             {
                 if (PhotonSystem.IsMasterClient)
-                {
                     SpamInfected(PhotonSystem.LocalPlayer);
-                }
                 else
                 {
                     NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not Master Client");
@@ -303,9 +298,7 @@ namespace MysticClient.Mods
                 if (PhotonSystem.IsMasterClient)
                 {
                     if (CreateGun(out VRRig rig))
-                    {
                         SpamInfected(RigUtils.GetNetFromRig(rig));
-                    }
                 }
                 else
                 {
@@ -324,12 +317,8 @@ namespace MysticClient.Mods
             if (PhotonSystem.InRoom)
             {
                 if (PhotonSystem.IsMasterClient)
-                {
                     foreach (var players in PhotonSystem.AllNetPlayers)
-                    {
                         SpamInfected(players);
-                    }
-                }
                 else
                 {
                     NotifiLib.SendNotification(NotifUtils.Error() + "You Are Not Master Client");
@@ -353,9 +342,8 @@ namespace MysticClient.Mods
                         if (IsTagged(RigUtils.GetNetFromRig(rig)))
                         {
                             RemoveInfected(RigUtils.GetNetFromRig(rig));
-                            NotifiLib.SendNotification(NotifUtils.Success() + $"Player {RigUtils.GetNetFromRig(rig).NickName} Has Been Un-Tagged");
-                        }
-                        else NotifiLib.SendNotification(NotifUtils.Warning() + $"Player {RigUtils.GetNetFromRig(rig).NickName} Is Already Un-Tagged");
+                            NotifiLib.SendNotification(NotifUtils.Success() + $"Player {RigUtils.GetNetFromRig(rig).NickName} Has Been Un-Tagged", 5f);
+                        } else NotifiLib.SendNotification(NotifUtils.Warning() + $"Player {RigUtils.GetNetFromRig(rig).NickName} Is Already Un-Tagged", 5f);
                     }
                     else
                     {
@@ -381,19 +369,19 @@ namespace MysticClient.Mods
                         if (!IsTagged(RigUtils.GetNetFromRig(rig)))
                         {
                             AddInfected(RigUtils.GetNetFromRig(rig));
-                            NotifiLib.SendNotification(NotifUtils.Success() + $"Player {rig.playerName} Has Been Tagged");
-                        } else NotifiLib.SendNotification(NotifUtils.Success() + $"Player {rig.playerName} Is Already Tagged");
+                            NotifiLib.SendNotification(NotifUtils.Success() + $"Player {rig.playerNameVisible} Has Been Tagged", 5f);
+                        } else NotifiLib.SendNotification(NotifUtils.Success() + $"Player {rig.playerNameVisible} Is Already Tagged", 5f);
                     }
                     else
                     {
-                        if (!IsTagged(RigUtils.GetNetFromRig(rig)))
+                        if (!IsTagged(rig.Creator))
                         {
                             LockOnRig(rig);
                             RigUtils.MyOfflineRig.enabled = false;
                             RigUtils.MyOfflineRig.rightHandTransform.SetPosition(rig.Position());
                             RigUtils.MyOfflineRig.leftHandTransform.SetPosition(rig.Position());
                             RigUtils.MyOfflineRig.transform.SetPosition(rig.Position());
-                        } else NotifiLib.SendNotification(NotifUtils.Success() + $"Player {rig.playerName} Has Been Tagged Or Already Was Tagged");
+                        } else NotifiLib.SendNotification(NotifUtils.Success() + $"Player {rig.playerNameVisible} Has Been Tagged Or Already Was Tagged", 5f);
                     }
                 } else { if (!PhotonSystem.IsMasterClient) RigUtils.MyOfflineRig.enabled = true; }
             }
@@ -415,7 +403,7 @@ namespace MysticClient.Mods
                         {
                             RemoveInfected(players);
                             GetToolTip(tooltip).enabled = false;
-                            NotifiLib.SendNotification(NotifUtils.Success() + "Everyone Has Been Un-Tagged");
+                            NotifiLib.SendNotification(NotifUtils.Success() + "Everyone Has Been Un-Tagged", 5f);
                         }
                     }
                 }
@@ -457,14 +445,13 @@ namespace MysticClient.Mods
                             NotifiLib.SendNotification(NotifUtils.Error() + "YOU MUST BE TAGGED OR MASTER");
                         }
                         else
-                            foreach (var players in PhotonSystem.PlayerListOthers)
-                                foreach (var rigs in RigUtils.VRRigs)
-                                {
-                                    RigUtils.MyOfflineRig.enabled = false;
-                                    RigUtils.MyOfflineRig.transform.position = rigs.transform.position + new Vector3(0, 2, 0);
-                                    RigUtils.MyPlayer.rightControllerTransform.position = rigs.transform.position;
-                                    RigUtils.MyPlayer.leftControllerTransform.position = rigs.transform.position;
-                                }
+                            foreach (var rigs in RigUtils.VRRigs)
+                            {
+                                RigUtils.MyOfflineRig.enabled = false;
+                                RigUtils.MyOfflineRig.transform.SetPosition(rigs.Position() - new Vector3(0, 2, 0));
+                                RigUtils.MyOfflineRig.rightHandTransform.SetPosition(rigs.Position());
+                                RigUtils.MyOfflineRig.leftHandTransform.SetPosition(rigs.Position());
+                            }
                     } else RigUtils.MyOfflineRig.enabled = true;
                 }
             }

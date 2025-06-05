@@ -46,7 +46,7 @@ namespace MysticClient.Mods
                         {
                             PhotonNetwork.Disconnect();
                             RPCProtection();
-                            NotifiLib.SendNotification(NotifUtils.AntiReport() + "Player " + rigs.playerName + " Attempted To Report You, You Have Been Disconnected");
+                            NotifiLib.SendNotification($"Player {rigs.playerNameVisible} Attempted To Report You, You Have Been Disconnected", 1f, NotifUtils.MessageInfo.AntiReport);
                             break;
                         }
                     }

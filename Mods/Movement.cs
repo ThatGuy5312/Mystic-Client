@@ -9,8 +9,7 @@ using MysticClient.Utils;
 using MysticClient.Menu;
 using BepInEx;
 using Valve.VR;
-using Steamworks;
-using UnityEngine.UIElements;
+using SColor = System.Drawing.Color;
 using System.Collections;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 using GorillaExtensions;
@@ -19,19 +18,73 @@ namespace MysticClient.Mods
 {
     public class Movement : GunLib
     {
+        public static void AirstrikeGun()
+        {
+            if (CreateGun(out RaycastHit hit))
+            {
+                antiRepeat = false;
+                return;
+            }
+            if (!antiRepeat) 
+            {
+                RigUtils.MyOnlineRig.transform.position = hit.point + (Vector3.up * 30f);
+                RigUtils.MyVelocity = new Vector3(0, -20f, 0);     
+                antiRepeat = true;
+            }
+        }
+
+        // based on iiDks AutoWalk at https://github.com/iiDk-the-actual/iis.Stupid.Menu/blob/master/Mods/Movement.cs
+        public static void WalkSim() // really upset that hands dont collide while on pc
+        {
+            if (UserInput.GetMouseButton(1))
+            {
+                var look = UserInput.mousePosition - Fun.oldMousePos;
+                Camera.main.transform.localEulerAngles += new Vector3(-look.y * .3f, look.x * .3f, 0);
+            }
+            Fun.oldMousePos = UserInput.mousePosition;
+            var tr = RigUtils.MyPlayer.bodyCollider.transform;
+            var rb = RigUtils.MyPlayer.bodyCollider.attachedRigidbody;
+            var joystick = SteamVR_Actions.gorillaTag_LeftJoystick2DAxis.GetAxis(SteamVR_Input_Sources.LeftHand);
+            var stick = joystick.magnitude > .05f ? joystick : new Vector2(
+                joystick.magnitude > .05f ? joystick.x : (UserInput.GetKey(KeyCode.D) ? 1 : 0) - (UserInput.GetKey(KeyCode.A) ? 1 : 0),
+                joystick.magnitude > .05f ? joystick.y : (UserInput.GetKey(KeyCode.W) ? 1 : 0) - (UserInput.GetKey(KeyCode.S) ? 1 : 0));
+            var armLength = .45f; var walkSpeed = 4.5f;
+            var dirocity = (tr.forward * stick.y + tr.right * stick.x).normalized;
+            if (SteamVR_Actions.gorillaTag_LeftJoystickClick.GetState(SteamVR_Input_Sources.LeftHand) || UserInput.GetKey(KeyCode.LeftShift)) walkSpeed *= 1.5f;
+            if (stick.magnitude > .05f)
+            {
+                rb.velocity = new Vector3(dirocity.x * walkSpeed, rb.velocity.y, dirocity.z * walkSpeed);
+                RigUtils.MyPlayer.leftControllerTransform.position = tr.position + tr.transform.forward * (Mathf.Sin(Time.time * walkSpeed) * (stick.y * armLength)) +
+                    tr.right * ((Mathf.Sin(Time.time * walkSpeed) * (stick.x * armLength)) - .2f) + 
+                    new Vector3(0, -.3f + (Mathf.Cos(Time.time * walkSpeed) * .2f), 0);
+                RigUtils.MyPlayer.rightControllerTransform.position = tr.position + tr.forward * (-Mathf.Sin(Time.time * walkSpeed) * (stick.y * armLength)) + 
+                    tr.right * ((-Mathf.Sin(Time.time * walkSpeed) * (stick.x * armLength)) + .2f) + 
+                    new Vector3(0, -.3f + (Mathf.Cos(Time.time * walkSpeed) * -.2f), 0);
+            }
+            if (UserInput.GetKeyDown(KeyCode.Space) || MUtils.CheckOnce(Controller.rightControllerPrimaryButton))
+            {
+                rb.velocity += RigUtils.MyPlayer.headCollider.transform.up * Time.deltaTime;
+                rb.AddForce(Vector3.up * 85f, ForceMode.Impulse);
+            }
+        }
+
         private static bool isRightGapple = false;
         private static bool isLeftGapple = false;
         private static Vector3 rightGrapplePoint;
         private static Vector3 leftGrapplePoint;
         private static SpringJoint rightJoint;
         private static SpringJoint leftJoint;
+        private static GameObject spiderPointerRight = null;
+        private static GameObject spiderPointerLeft = null;
 
+        public static void SpiderMonkeOff() { spiderPointerRight?.SetActive(false); spiderPointerLeft?.SetActive(false); }
         public static void SpiderMonke()
         {
             var playerRB = RigUtils.MyOnlineRig.bodyCollider.attachedRigidbody;
             var rightGappleDuration = .2f; var leftGrappleDuration = .2f;
             if (Controller.rightGrab || UserInput.GetMouseButton(1))
             {
+                spiderPointerRight.SetActive(false);
                 if (!isRightGapple)
                 {
                     isRightGapple = true;
@@ -57,13 +110,26 @@ namespace MysticClient.Mods
             {
                 isRightGapple = false;
                 rightJoint.Destroy();
+                if (Physics.Raycast(RigUtils.MyOnlineRig.rightHandTransform.position, RigUtils.MyOnlineRig.rightHandTransform.forward, out var hit))
+                {
+                    if (spiderPointerRight == null)
+                        spiderPointerRight = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    spiderPointerRight.Destroy<Collider>();
+                    spiderPointerRight.transform.localScale = new Vector3(.2f, .2f, .2f);
+                    spiderPointerRight.transform.position = hit.point;
+                    DrawLine(RigUtils.MyOnlineRig.rightHandTransform.position, hit.point, MenuSettings.NormalColor, .025f);
+                    spiderPointerRight.GetRenderer().material = TransparentMaterial(GetChangeColorA(MenuSettings.NormalColor, .5f));
+                    spiderPointerRight.transform.Rotate(1f, 1f, 1f);
+                    spiderPointerRight.SetActive(true);
+                }
             }
             if (Controller.leftGrab || UserInput.GetMouseButton(0))
             {
+                spiderPointerLeft.SetActive(false);
                 if (!isLeftGapple)
                 {
                     isLeftGapple = true;
-                    if (Physics.Raycast(RigUtils.MyOnlineRig.rightHandTransform.position, RigUtils.MyOnlineRig.rightHandTransform.forward, out var hit))
+                    if (Physics.Raycast(RigUtils.MyOnlineRig.leftHandTransform.position, RigUtils.MyOnlineRig.leftHandTransform.forward, out var hit))
                     {
                         leftGrapplePoint = hit.point;
                         leftJoint = RigUtils.MyOnlineRig.gameObject.GetOrAddComponent<SpringJoint>();
@@ -85,6 +151,18 @@ namespace MysticClient.Mods
             {
                 isLeftGapple = false;
                 leftJoint.Destroy();
+                if (Physics.Raycast(RigUtils.MyOnlineRig.leftHandTransform.position, RigUtils.MyOnlineRig.leftHandTransform.forward, out var hit))
+                { 
+                    if (spiderPointerLeft == null)
+                        spiderPointerLeft = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    spiderPointerLeft.Destroy<Collider>();
+                    spiderPointerLeft.transform.localScale = new Vector3(.2f, .2f, .2f);
+                    spiderPointerLeft.transform.position = hit.point;
+                    DrawLine(RigUtils.MyOnlineRig.leftHandTransform.position, hit.point, MenuSettings.NormalColor, .025f);
+                    spiderPointerLeft.GetRenderer().material = TransparentMaterial(GetChangeColorA(MenuSettings.NormalColor, .5f));
+                    spiderPointerLeft.transform.Rotate(1f, 1f, 1f);
+                    spiderPointerLeft.SetActive(true);
+                }
             }
         }
 
@@ -97,24 +175,11 @@ namespace MysticClient.Mods
                 var direction = (point - playerRB.position).normalized;
                 playerRB.AddForce(direction * force, ForceMode.Force);
                 if (timeElaped < duration / 2)
-                    playerRB.AddForce(direction * (force / 2), ForceMode.Force);
+                    playerRB.AddForce(direction * (force / 2), ForceMode.Impulse);
                 yield return null;
             }
         }
 
-        private static bool lasttouchleft;
-        private static bool lasttouchright;
-        public static void Pull() // thx Zav (@12swoe)
-        {
-            if (((!RigUtils.MyPlayer.wasLeftHandTouching && lasttouchleft) || (!RigUtils.MyPlayer.wasRightHandTouching && lasttouchright)) && Controller.rightGrab)
-            {
-                var pullPower = .25f;
-                var vel = RigUtils.MyPlayer.GetComponent<Rigidbody>().velocity;
-                RigUtils.MyPlayer.transform.position += new Vector3(vel.x * pullPower, 0f, vel.z * pullPower);
-            }
-            lasttouchleft = RigUtils.MyPlayer.wasLeftHandTouching;
-            lasttouchright = RigUtils.MyPlayer.wasRightHandTouching;
-        }
         public static void TagJoin(string did, bool alsodid)
         {
             PlayerPrefs.SetString("tutorial", did);
@@ -191,14 +256,14 @@ namespace MysticClient.Mods
         private static bool antiRepeat;
         public static void TPGun()
         {
-            if (CreateGun())
+            if (CreateGun(out RaycastHit hit))
             {
                 antiRepeat = false;
                 return;
             }
             if (!antiRepeat) // this is a really old thing people did i just still like it
             {
-                RigUtils.MyOnlineRig.transform.position = pointer.transform.position;
+                RigUtils.MyOnlineRig.transform.position = hit.point;
                 RigUtils.MyOnlineRig.GetComponent<Rigidbody>().velocity = Vector3.zero;
                 antiRepeat = true;
             }
@@ -207,25 +272,66 @@ namespace MysticClient.Mods
         {
             if (Controller.leftGrab || UserInput.GetMouseButton(0))
             {
-                RigUtils.MyOnlineRig.offlineVRRig.PlayHandTapLocal(115, false, 0.1f);
+                RigUtils.MyOfflineRig.PlayHandTapLocal(115, false, .1f);
                 RigUtils.MyPlayer.bodyCollider.attachedRigidbody.AddForce(10f * -RigUtils.MyOnlineRig.leftHandTransform.right, ForceMode.Acceleration);
                 RigUtils.MyOnlineRig.StartVibration(true, RigUtils.MyOnlineRig.tapHapticStrength / 50f * RigUtils.MyPlayer.bodyCollider.attachedRigidbody.velocity.magnitude, RigUtils.MyOnlineRig.tapHapticDuration);
-            }
+                if (GetEnabled("Fire Particles"))
+                    CreateParticles(RigUtils.MyOnlineRig.leftHandTransform.position, new ParticleSystem.MinMaxGradient(new Gradient
+                    {
+                        colorKeys = new GradientColorKey[]
+                        {
+                            new GradientColorKey(new Color(1, .5f, 0), 0),
+                            new GradientColorKey(new Color(1, 0, 0), .5f),
+                            new GradientColorKey(new Color(.5f, 0, 0), 1)
+                        },
+                        alphaKeys = new GradientAlphaKey[]
+                        {
+                            new GradientAlphaKey(1, 0),
+                            new GradientAlphaKey(.5f, .5f),
+                            new GradientAlphaKey(0, 1)
+                        }
+                    }));
+                if (GetEnabled("Fire Trails"))
+                    RigUtils.MyOnlineRig.leftHandTransform.gameObject.AttachTrail(.1f, new Material(DefaultShader) { color = MenuSettings.NormalColor });
+            } else RigUtils.MyOnlineRig.leftHandTransform.gameObject.Destroy<TrailRenderer>();
             if (Controller.rightGrab || UserInput.GetMouseButton(1))
             {
-                RigUtils.MyOnlineRig.offlineVRRig.PlayHandTapLocal(115, false, 0.1f);
+                RigUtils.MyOfflineRig.PlayHandTapLocal(115, false, .1f);
                 RigUtils.MyPlayer.bodyCollider.attachedRigidbody.AddForce(10f * RigUtils.MyOnlineRig.rightHandTransform.right, ForceMode.Acceleration);
                 RigUtils.MyOnlineRig.StartVibration(false, RigUtils.MyOnlineRig.tapHapticStrength / 50f * RigUtils.MyPlayer.bodyCollider.attachedRigidbody.velocity.magnitude, RigUtils.MyOnlineRig.tapHapticDuration);
-            }
+                if (GetEnabled("Fire Particles"))
+                    CreateParticles(RigUtils.MyOnlineRig.rightHandTransform.position, new ParticleSystem.MinMaxGradient(new Gradient
+                    {
+                        colorKeys = new GradientColorKey[]
+                        {
+                            new GradientColorKey(new Color(1, .5f, 0), 0),
+                            new GradientColorKey(new Color(1, 0, 0), .5f),
+                            new GradientColorKey(new Color(.5f, 0, 0), 1)
+                        },
+                        alphaKeys = new GradientAlphaKey[]
+                        {
+                            new GradientAlphaKey(1, 0),
+                            new GradientAlphaKey(.5f, .5f),
+                            new GradientAlphaKey(0, 1)
+                        }
+                    }));
+                if (GetEnabled("Fire Trails"))
+                    RigUtils.MyOnlineRig.rightHandTransform.gameObject.AttachTrail(.1f, new Material(DefaultShader) { color = MenuSettings.NormalColor });
+            } else RigUtils.MyOnlineRig.rightHandTransform.gameObject.Destroy<TrailRenderer>();
         }
         public static float flySpeed = 15f;
-        public static void Fly(float speed)
+        public static void Fly()
         {
             if (Controller.leftControllerPrimaryButton || UserInput.GetMouseButton(0))
             {
-                RigUtils.MyPlayer.transform.position += RigUtils.MyPlayer.headCollider.transform.forward * Time.deltaTime * speed;
+                RigUtils.MyPlayer.transform.position += RigUtils.MyPlayer.headCollider.transform.forward * Time.deltaTime * flySpeed;
                 RigUtils.MyPlayer.GetComponent<Rigidbody>().velocity = Vector3.zero;
             }
+        }
+        public static void VelocityFly()
+        {
+            if (Controller.leftControllerPrimaryButton || UserInput.GetMouseButton(0))
+                RigUtils.MyVelocity += RigUtils.MyPlayer.headCollider.transform.forward * Time.deltaTime * flySpeed;
         }
         public static float speedBoostSpeed = 12f;
 
@@ -263,22 +369,20 @@ namespace MysticClient.Mods
             {
                 if (!once_right && jump_right_local == null)
                 {
-                    if (sticky)
-                        jump_right_local = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                    else
-                        jump_right_local = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    if (invis)
-                        Destroy(jump_right_local.GetComponent<Renderer>());
-                    jump_right_local.transform.localScale = plank ? new Vector3(0.017f, 0.28f, 0.9999f) * RigUtils.MyPlayer.scale : scale * RigUtils.MyPlayer.scale;
-                    jump_right_local.transform.position = new Vector3(0f, -0.01f, 0f) + RigUtils.MyPlayer.rightControllerTransform.position;
+                    if (sticky) jump_right_local = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    else jump_right_local = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    if (invis) Destroy(jump_right_local.GetComponent<Renderer>());
+                    jump_right_local.transform.localScale = plank ? new Vector3(.017f, .28f, .9999f) * RigUtils.MyPlayer.scale : scale *= RigUtils.MyPlayer.scale;
+                    jump_right_local.transform.position = new Vector3(0, -.01f, 0) + RigUtils.MyPlayer.rightControllerTransform.position;
                     jump_right_local.transform.rotation = RigUtils.MyPlayer.rightControllerTransform.rotation;
                     jump_right_local.name = "Plats";
                     jump_right_local.layer = 0;
-                    object[] eventContent = new object[]
+                    //if (GetEnabled("Round Menu")) RoundOtherObject(jump_right_local);
+                    object[] eventContent = 
                     {
-                     new Vector3(0f, -0.0100f, 0f) + RigUtils.MyPlayer.rightControllerTransform.position,
+                     new Vector3(0, -.0100f, 0) + RigUtils.MyPlayer.rightControllerTransform.position,
                      RigUtils.MyPlayer.rightControllerTransform.rotation,
-                     jump_right_local.transform.localScale, platfromSingleColor, platColorKeys, PlatColor, sticky, invis
+                     jump_right_local.transform.localScale, platfromSingleColor, platColorKeys, PlatColor, sticky, invis//, GetEnabled("Round Menu")
                     };
                     LegacySendEvent(70, eventContent, new RaiseEventOptions { Receivers = ReceiverGroup.Others }, true);
                     once_right = true;
@@ -289,8 +393,7 @@ namespace MysticClient.Mods
                         colorChanger.colors = new Gradient { colorKeys = platColorKeys };
                         colorChanger.loop = true;
                     }
-                    else
-                        jump_right_local.GetComponent<Renderer>().material.color = PlatColor;
+                    else jump_right_local.GetComponent<Renderer>().material.color = PlatColor;
                 }
             }
             else if (!once_right_false && jump_right_local != null && platformPhysics)
@@ -315,22 +418,20 @@ namespace MysticClient.Mods
             {
                 if (!once_left && jump_left_local == null)
                 {
-                    if (sticky)
-                        jump_left_local = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                    else
-                        jump_left_local = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    if (invis)
-                        Destroy(jump_left_local.GetComponent<Renderer>());
-                    jump_left_local.transform.localScale = plank ? new Vector3(0.017f, 0.28f, 0.9999f) * RigUtils.MyPlayer.scale : scale * RigUtils.MyPlayer.scale;
-                    jump_left_local.transform.position = new Vector3(0f, -0.01f, 0f) + RigUtils.MyPlayer.leftControllerTransform.position;
+                    if (sticky) jump_left_local = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    else jump_left_local = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    if (invis) Destroy(jump_left_local.GetComponent<Renderer>());
+                    jump_left_local.transform.localScale = plank ? new Vector3(.017f, .28f, .9999f) * RigUtils.MyPlayer.scale : scale * RigUtils.MyPlayer.scale;
+                    jump_left_local.transform.position = new Vector3(0, -.01f, 0) + RigUtils.MyPlayer.leftControllerTransform.position;
                     jump_left_local.transform.rotation = RigUtils.MyPlayer.leftControllerTransform.rotation;
                     jump_left_local.name = "Plats";
                     jump_left_local.layer = 0;
-                    var eventContent = new object[]
+                    //if (GetEnabled("Round Menu")) RoundOtherObject(jump_left_local);
+                    object[] eventContent =
                     {
-                     new Vector3(0f, -0.0100f, 0f) + RigUtils.MyPlayer.leftControllerTransform.position,
+                     new Vector3(0, -.0100f, 0) + RigUtils.MyPlayer.leftControllerTransform.position,
                      RigUtils.MyPlayer.leftControllerTransform.rotation,
-                     jump_left_local.transform.localScale, platfromSingleColor, platColorKeys, PlatColor, sticky, invis
+                     jump_left_local.transform.localScale, platfromSingleColor, platColorKeys, PlatColor, sticky, invis//, GetEnabled("Round Menu")
                     };
                     LegacySendEvent(69, eventContent, new RaiseEventOptions { Receivers = ReceiverGroup.Others }, true);
                     once_left = true;
@@ -341,8 +442,7 @@ namespace MysticClient.Mods
                         colorChanger.colors = new Gradient { colorKeys = platColorKeys };
                         colorChanger.loop = true;
                     }
-                    else
-                        jump_left_local.GetComponent<Renderer>().material.color = PlatColor;
+                    else jump_left_local.GetComponent<Renderer>().material.color = PlatColor;
                 }
             }
             else if (!once_left_false && jump_left_local != null && platformPhysics)
@@ -365,14 +465,13 @@ namespace MysticClient.Mods
             }
         }
 
-        public static Vector3 scale = new Vector3(0.0125f, 0.28f, 0.3825f);
+        public static Vector3 scale = new Vector3(.0125f, .28f, .3825f);
         public static bool once_left;
         public static bool once_right;
         public static bool once_left_false;
         public static bool once_right_false;
         public static GameObject[] jump_left_network = new GameObject[9999];
         public static GameObject[] jump_right_network = new GameObject[9999];
-        public static GameObject[] ball_network = new GameObject[9999];
         public static GameObject[] platgun_network = new GameObject[9999];
         public static GameObject[] ballsgun_network = new GameObject[9999];
         public static GameObject jump_left_local = null;

@@ -1,15 +1,5 @@
-﻿using BepInEx;
-using MysticClient.Menu;
-using MysticClient.Mods;
-using Photon.Pun;
-using System.Collections;
-using System.Collections.Generic;
-using System.ComponentModel.Design;
-using System.Runtime.CompilerServices;
-using Unity.XR.CoreUtils;
+﻿using MysticClient.Menu;
 using UnityEngine;
-using UnityEngine.Animations.Rigging;
-using Viveport;
 
 namespace MysticClient.Utils
 {
@@ -125,7 +115,7 @@ namespace MysticClient.Utils
             if (pointer == null)
             {
                 pointer = GameObject.CreatePrimitive(shape);
-                pointer.GetComponent<Renderer>().material.shader = Shader.Find("GUI/Text Shader");
+                pointer.GetComponent<Renderer>().material.shader = Main.TextShader;
                 pointer.transform.localScale = new Vector3(0.2f, 0.2f, 0.2f);
                 Destroy(pointer.GetComponent<Rigidbody>());
                 Destroy(pointer.GetComponent<Collider>());
@@ -135,7 +125,7 @@ namespace MysticClient.Utils
                 LineRender.endWidth = 0.025f;
                 LineRender.positionCount = 3;
                 LineRender.useWorldSpace = true;
-                LineRender.material.shader = Shader.Find("GUI/Text Shader");
+                LineRender.material.shader = Main.TextShader;
                 LineRender.enabled = false;
             }
         }
@@ -221,27 +211,41 @@ namespace MysticClient.Utils
         private static Vector3 CalculatePoint(float t, Vector3 start, Vector3 mid, Vector3 end) => Mathf.Pow(1 - t, 2) * start + 2 * (1 - t) * t * mid + Mathf.Pow(t, 2) * end;
         private static Vector3 GetMiddle(Vector3 vector) => new Vector3(vector.x / 2f, vector.y / 2f, vector.z / 2f);
         private static Vector3 CalculateOffset(float currentAngle, Vector3 direction, float angle, Vector3 right, Vector3 up) => Quaternion.AngleAxis(Mathf.Rad2Deg * currentAngle, direction) * (right * Mathf.Cos(angle) + up * Mathf.Sin(angle));
-        private static int GunMasks() => RigUtils.MyPlayer.locomotionEnabledLayers + LayerMask.GetMask("Gorilla Tag Collider", "Gorilla Body Collider", "Rope Swing");
+        public static int GunMasks() => RigUtils.MyPlayer.locomotionEnabledLayers + LayerMask.GetMask("Gorilla Tag Collider", "Gorilla Body Collider", "Rope Swing");
 
-        public class MultiGun : MonoBehaviour // this was made really shitty but idc
+        /*public class Gun : MonoBehaviour // this was made really shitty but idc 
         {
             private const int DefaultGunCount = 100;
-            public static List<bool> leftHandGun = new List<bool>(DefaultGunCount);
-            public static List<GameObject> pointer = new List<GameObject>(DefaultGunCount);
-            private static List<LineRenderer> LineRender = new List<LineRenderer>(DefaultGunCount);
-            public static bool CreateGun(out RaycastHit hit, int gunID)
+            public List<bool> leftHandGun = new List<bool>(DefaultGunCount);
+            public List<GameObject> pointer = new List<GameObject>(DefaultGunCount);
+            private List<LineRenderer> lineRender = new List<LineRenderer>(DefaultGunCount);
+            public List<RaycastHit> raycasts = new List<RaycastHit>(DefaultGunCount);
+            public void LockOnRig(VRRig rig, int gunID) => pointer[gunID].transform.position = rig.head.headTransform.position;
+            public void LockOnObject(GameObject _object, int gunID) => pointer[gunID].transform.position = _object.transform.position;
+
+            public Gun()
+            {
+                for (int i = 0; i < DefaultGunCount; i++)
+                {
+                    leftHandGun.Add(false);
+                    pointer.Add(null);
+                    lineRender.Add(null);
+                }
+            }
+
+            public bool CreateGun(out RaycastHit hit, int gunID)
             {
                 CreateGunInternal(out hit, gunID);
                 return pointer[gunID].activeSelf && CheckInputs(gunID);
             }
-            public static bool CreateGun(bool customInput, out RaycastHit hit, int gunID)
+
+            public bool CreateGun(bool customInput, out RaycastHit hit, int gunID)
             {
                 CreateGunInternal(out hit, gunID);
                 return pointer[gunID].activeSelf && customInput;
             }
-            public static void LockOnRig(VRRig rig, int gunID) => pointer[gunID].transform.position = rig.head.headTransform.position;
-            public static void LockOnObject(GameObject _object, int gunID) => pointer[gunID].transform.position = _object.transform.position;
-            private static bool CreateGunInternal(out RaycastHit hit, int gunID)
+
+            private bool CreateGunInternal(out RaycastHit hit, int gunID)
             {
                 RenderGun(gunID);
                 if (Main.UserInput.GetMouseButton(1))
@@ -249,10 +253,11 @@ namespace MysticClient.Utils
                     if (!Main.UserInput.GetMouseButton(1))
                     {
                         pointer[gunID].SetActive(false);
-                        LineRender[gunID].enabled = false;
+                        lineRender[gunID].enabled = false;
                         Physics.Raycast(Main.mainCamera.ScreenPointToRay(Main.UserInput.mousePosition), out hit);
                         return false;
                     }
+
                     var hand = leftHandGun[gunID] ? RigUtils.MyOnlineRig.leftHandTransform : RigUtils.MyOnlineRig.rightHandTransform;
                     if (Physics.Raycast(Main.mainCamera.ScreenPointToRay(Main.UserInput.mousePosition), out hit, 1000f, GunMasks()))
                     {
@@ -263,16 +268,17 @@ namespace MysticClient.Utils
                 else
                 {
                     var hand = leftHandGun[gunID] ? RigUtils.MyOnlineRig.leftHandTransform : RigUtils.MyOnlineRig.rightHandTransform;
-                    var newRay = leftHandGun[gunID] ? hand.forward : hand.forward;
-                    var oldRay = leftHandGun[gunID] ? -hand.up : -hand.up;
+                    var newRay = hand.forward;
+                    var oldRay = -hand.up;
+
                     if (leftHandGun[gunID] ? !Main.Controller.leftGrab : !Main.Controller.rightGrab)
                     {
                         pointer[gunID].SetActive(false);
-                        LineRender[gunID].enabled = false;
-                        Physics.Raycast(hand.position, oldRayDirection ? oldRay : newRay, out hit);
+                        lineRender[gunID].enabled = false;
+                        Physics.Raycast(hand.position, oldRay, out hit);
                         return false;
                     }
-                    if (Physics.Raycast(hand.position, oldRayDirection ? oldRay : newRay, out hit))
+                    if (Physics.Raycast(hand.position, newRay, out hit))
                     {
                         InitializeGun(hit, hand, gunID);
                         return true;
@@ -280,41 +286,42 @@ namespace MysticClient.Utils
                 }
                 return false;
             }
-            private static void RenderGun(int gunID)
+
+            private void RenderGun(int gunID)
             {
                 if (pointer[gunID] == null)
                 {
                     pointer[gunID] = GameObject.CreatePrimitive(gunShape);
-                    pointer[gunID].GetComponent<Renderer>().material.shader = Shader.Find("GUI/Text Shader");
+                    pointer[gunID].GetComponent<Renderer>().material.shader = Main.TextShader;
                     pointer[gunID].transform.localScale = Vector3.one * 0.2f;
                     Destroy(pointer[gunID].GetComponent<Rigidbody>());
                     Destroy(pointer[gunID].GetComponent<Collider>());
                     pointer[gunID].SetActive(false);
-                    LineRender[gunID] = pointer[gunID].AddComponent<LineRenderer>();
-                    LineRender[gunID].startWidth = 0.025f;
-                    LineRender[gunID].endWidth = 0.025f;
-                    LineRender[gunID].positionCount = 3;
-                    LineRender[gunID].useWorldSpace = true;
-                    LineRender[gunID].material.shader = Shader.Find("GUI/Text Shader");
-                    LineRender[gunID].enabled = false;
+                    lineRender[gunID] = pointer[gunID].AddComponent<LineRenderer>();
+                    lineRender[gunID].startWidth = 0.025f;
+                    lineRender[gunID].endWidth = 0.025f;
+                    lineRender[gunID].positionCount = 3;
+                    lineRender[gunID].useWorldSpace = true;
+                    lineRender[gunID].material.shader = Main.TextShader;
+                    lineRender[gunID].enabled = false;
                 }
             }
-            private static void InitializeGun(RaycastHit hit, Transform hand, int gunID)
+
+            private void InitializeGun(RaycastHit hit, Transform hand, int gunID)
             {
                 pointer[gunID].transform.position = (gunType == 1) ? hit.point : Vector3.Lerp(pointer[gunID].transform.position, hit.point, Time.deltaTime * pointerDelay);
                 if (gunType == 1)
                 {
-                    LineRender[gunID].positionCount = 2;
-                    LineRender[gunID].SetPosition(0, hand.position);
-                    LineRender[gunID].SetPosition(1, pointer[gunID].transform.position);
+                    lineRender[gunID].positionCount = 2;
+                    lineRender[gunID].SetPosition(0, hand.position);
+                    lineRender[gunID].SetPosition(1, pointer[gunID].transform.position);
                 }
                 else if (gunType == 0)
                 {
-                    //var midPos = Vector3.Lerp(hand.position, pointer.transform.position, .5f) + Vector3.up * bendAmount;
-                    LineRender[gunID].positionCount = 3;
-                    LineRender[gunID].SetPosition(0, hand.position);
-                    LineRender[gunID].SetPosition(1, GetMiddle(hand.position + pointer[gunID].transform.position) + Vector3.up * bendAmount);
-                    LineRender[gunID].SetPosition(2, pointer[gunID].transform.position);
+                    lineRender[gunID].positionCount = 3;
+                    lineRender[gunID].SetPosition(0, hand.position);
+                    lineRender[gunID].SetPosition(1, GetMiddle(hand.position + pointer[gunID].transform.position) + Vector3.up * bendAmount);
+                    lineRender[gunID].SetPosition(2, pointer[gunID].transform.position);
                 }
                 else if (gunType == 2)
                 {
@@ -324,8 +331,8 @@ namespace MysticClient.Utils
                         var t = i / (float)(pointCount - 1);
                         curvePoints[i] = CalculatePoint(t, hand.position, GetMiddle(hand.position + hit.point), pointer[gunID].transform.position);
                     }
-                    LineRender[gunID].positionCount = pointCount;
-                    LineRender[gunID].SetPositions(curvePoints);
+                    lineRender[gunID].positionCount = pointCount;
+                    lineRender[gunID].SetPositions(curvePoints);
                 }
                 else if (gunType == 3)
                 {
@@ -351,31 +358,82 @@ namespace MysticClient.Utils
                         points[i] = startPos + direction * (t * distance) + localOffset * radius;
                     }
 
-                    LineRender[gunID].positionCount = pointCount;
-                    LineRender[gunID].SetPositions(points);
+                    lineRender[gunID].positionCount = pointCount;
+                    lineRender[gunID].SetPositions(points);
                 }
                 pointer[gunID].SetActive(true);
-                LineRender[gunID].enabled = true;
+                lineRender[gunID].enabled = true;
                 pointer[gunID].transform.Rotate(0.8f, 0.8f, 0.8f);
                 pointer[gunID].transform.localScale = Vector3.Lerp(
                     new Vector3(0.2f, 0.2f, 0.2f),
                     new Vector3(0.3f, 0.3f, 0.3f),
                     Mathf.PingPong(Time.time, 1));
             }
-            private static bool CheckInputs(int gunID)
+
+            private bool CheckInputs(int gunID)
             {
-                var on = leftHandGun[gunID] ? (Main.Controller.leftControllerIndexFloat.TriggerDown() || Main.UserInput.GetMouseButton(0)) :
-                    (Main.Controller.rightControllerIndexFloat.TriggerDown() || Main.UserInput.GetMouseButton(0));
-                SetGunColor(on ? enabledColor : disabledColor, gunID);
+                var on = leftHandGun[gunID] ? Main.Controller.leftControllerIndexFloat.TriggerDown() || Main.UserInput.GetMouseButton(0)
+                                            : Main.Controller.rightControllerIndexFloat.TriggerDown() || Main.UserInput.GetMouseButton(0);
+                SetGunColor(on ? Color.green : Color.red, gunID);
                 return on;
             }
-            private static void SetGunColor(Color color, int gunID)
+
+            private void SetGunColor(Color color, int gunID)
             {
-                pointer[gunID].GetComponent<Renderer>().material.color = color;
-                LineRender[gunID].startColor = color;
-                LineRender[gunID].endColor = color;
-                LineRender[gunID].material.color = color;
+                pointer[gunID].ChangeColor(color);
+                lineRender[gunID].startColor = color;
+                lineRender[gunID].endColor = color;
+                lineRender[gunID].material.color = color;
             }
-        }
+        }*/
+
+        /*public class GunLibrary
+        {
+            public static GunData CreateGun(Action gunAction)
+            {
+                if (ControllerInputPoller.instance.rightGrab)
+                {
+                    var gunData = new GunData { sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere) };
+
+                    UnityEngine.Object.Destroy(gunData.sphere.GetComponent<Rigidbody>());
+                    UnityEngine.Object.Destroy(gunData.sphere.GetComponent<Collider>());
+
+                    gunData.sphere.GetComponent<Renderer>().material.shader = Shader.Find("GUI/Text Shader");
+                    gunData.sphere.GetComponent<Renderer>().material.color = Color.blue; // color of gun
+
+                    UnityEngine.Object.Destroy(gunData.sphere, Time.deltaTime);
+
+                    if (Physics.Raycast(GorillaTagger.Instance.rightHandTransform.position, -GorillaTagger.Instance.rightHandTransform.up, out gunData.raycast))
+                    {
+                        gunData.sphere.transform.position = gunData.raycast.point;
+
+                        gunData.line = gunData.sphere.AddComponent<LineRenderer>();
+                        gunData.line.startWidth = .025f;
+                        gunData.line.endWidth = .025f;
+                        gunData.line.positionCount = 2;
+                        gunData.line.useWorldSpace = true;
+                        gunData.line.material.shader = Shader.Find("GUI/Text Shader");
+
+                        gunData.line.SetPosition(0, GorillaTagger.Instance.rightHandTransform.position);
+                        gunData.line.SetPosition(0, gunData.raycast.point);
+
+                        if (ControllerInputPoller.instance.rightControllerIndexFloat > .5f)
+                        {
+                            gunData.rigHit = gunData.raycast.collider.GetComponentInParent<VRRig>()?? null;
+                            gunAction();
+                        }
+                    }
+                }
+                return null;
+            }
+
+            public class GunData
+            {
+                public GameObject sphere;
+                public LineRenderer line;
+                public RaycastHit raycast;
+                public VRRig rigHit;
+            }
+        }*/
     }
 }
