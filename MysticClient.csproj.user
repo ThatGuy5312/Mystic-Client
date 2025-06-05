@@ -2,7 +2,13 @@
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup />
   <ItemGroup>
+    <Compile Update="Classes\BackupInputs.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Update="Classes\ColorChanger.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="Classes\MysticMenuPlugin.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Update="Classes\Networking.cs">
@@ -11,13 +17,16 @@
     <Compile Update="Classes\RPCManager.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Update="Classes\Saving.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Update="Classes\TimedBehaviour.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Update="Classes\UnUsed.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Update="Classes\VoiceCommands.cs">
+    <Compile Update="Menu\UI.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Update="Mods\Fun.cs">
@@ -44,10 +53,19 @@
     <Compile Update="Patches\PhotonRegister.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Update="Patches\ScreenPatch.cs">
+    <Compile Update="Plugin.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Update="Plugin.cs">
+    <Compile Update="UISetting\Interface.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="UISetting\UIInputs.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="UISetting\UIMenu.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="Utils\MUtils.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Update="Utils\GunLib.cs">
